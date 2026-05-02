@@ -294,12 +294,15 @@ Notes:
 
 ## Citation
 
+```bibtex
 @inproceedings{deng2026cocoreviewbench,
   title     = {{CoCoReviewBench}: A Completeness- and Correctness-Oriented Benchmark for {AI} Reviewers},
   author    = {Deng, Hexuan and Li, Yichen and Ke, Xiaopeng and Hu, Ruina and Wong, Derek F. and Wang, Yue and Liu, Xuebo and Huang, Dehao and Zhang, Min},
   booktitle = {Proceedings of the 43rd International Conference on Machine Learning},
-  year      = {2026},
+  series    = {Proceedings of Machine Learning Research},
   publisher = {PMLR},
+  year      = {2026},
   note      = {To appear},
   url       = {https://github.com/hexuandeng/CoCoReviewBench}
 }
+```
