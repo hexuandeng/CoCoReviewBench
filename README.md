@@ -13,7 +13,8 @@
     <a href="#overview">Overview</a> |
     <a href="#evaluation-pipeline">Evaluation</a> |
     <a href="#benchmark-construction">Benchmark</a> |
-    <a href="#license">License</a>
+    <a href="#license">License</a> |
+    <a href="#citation">Citation</a>
   </p>
 </div>
 
