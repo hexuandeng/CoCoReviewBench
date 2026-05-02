@@ -1,0 +1,292 @@
+# Learning Recourse on Instance Environment to Enhance Prediction Accuracy
+
+Anonymous Author(s)
+
+Affiliation
+
+Address
+
+email
+
+# Abstract
+
+Machine Learning models are often susceptible to poor performance on instances sampled from bad environments. For example, an image classifier could provide low accuracy on images captured under low lighting conditions. In high stake ML applications, such as AI-driven medical diagnostics, a better option could be to provide recourse in the form of alternative environment settings in which to recapture the instance for more reliable diagnostics. In this paper, we propose a model called RECOURSENET that learns to apply recourse on the space of environments so that the recoursed instances are amenable to better predictions by the classifier. Learning to output optimal recourse is challenging because we do not assume access to the underlying physical process that generates the recoursed instances. Also, the optimal setting could be instance-dependent — for example the best camera angle for object recognition could be a function of the object's shape. We propose a novel three-level training method that (a) Learns a classifier that is optimized for high performance under recourse, (b) Learns a recourse predictor when the training data may contain only limited instances under good environment settings, and (c) Triggers recourse selectively only when recourse is likely to improve classifier confidence. We experiment with synthetic and real world datasets to show the efficacy of our proposed approach.
+
+# 1 Introduction
+
+The performance of any supervised learning model depends strongly on the quality of input instances. However, in practice, instances may be of suboptimal quality when generated in adverse environment settings. For example, even an expressive image classification model may misclassify an image shot at an extreme close-up or at a wrong angle or under poor lighting [10, 24]. Despite large training sizes, such unfavorable instances can deteriorate model performance which can have serious consequences in high stake scenarios like AI guided crop monitoring [18], automatic disease diagnosis from images [19], and AI driven accessibility enhancement for the hearing impaired.
+
+Mitigating the effect of such unfavorable instances entails the design of recourse mechanism to recommend alternative environment settings that yield instances revealing the target class. For example, in low cost smartphone based medical diagnosis [19] where imaging is performed by non-experts, such recourse mechanisms can interactively recommend camera settings that yield images optimal for the upstream diagnosis model. The optimal camera settings could be label dependent. For example, the best camera angle for recognizing an aeroplane could be different from the angle for recognizing poles.
+
+More formally, the problem we seek to address in this paper is as follows. We have an object  $z$  in the physical space (e.g. a crop) with an unknown true label  $y$  (e.g. type of disease). Let  $\beta \in \mathcal{B}$  be the environment setting under which we capture a digital representation  $\mathbf{x}$  of  $z$  to diagnose the label from
+
+an upstream classifier  $f_{\theta}(\mathbf{x})$ . Our goal during recourse is to recommend an alternative setting  $\beta'$  (if any) to the user for getting a different representation  $\mathbf{x}'$  of  $z$  where  $f_{\theta}(\mathbf{x}')$  is more likely to be correct than  $f_{\theta}(\mathbf{x})$ .  
+The above problem can be thought of as an instance of algorithmic recourse, on which there has been much work in recent years [26, 25, 20, 5, 28, 8]. These methods recommend recourse actions on the instance space  $\mathbf{x}$ , which is difficult to realize on raw data for objects such as images and speech. Instead we propose to intervene at the level of the environment which generates the instance via an unknown physical process. We view the contributions of our present work under three facets as explained below:
+
+(i) Novel framework for recourse mechanism. We propose RECOURSENET, a trainable recourse mechanism which recommends modified actions to the end user so that, if acted upon the environment, it can generate instances with improved accuracy. RECOURSENET consists of three components: (1) a classifier  $f_{\theta}$ , (2) a recourse trigger  $\pi$  (3) a recourse recommender network  $g_{\phi}$ . Given an instance  $(\mathbf{x}, \beta)$ , the recourse trigger  $\pi$  first decides whether to recommend recourse for  $\mathbf{x}$ . If so, the recourse recommender  $g_{\phi}$  suggests an alternative environment  $\beta'$ . Using these, the user generates a new instance  $\mathbf{x}'$ , on which  $f_{\theta}$  would give the correct label with potentially higher confidence.  
+(ii) Three level training proposal. The main challenge of RECOURSENET is that we do not assume access to the latent physical process  $Z$  that generates an  $\mathbf{x}'$  given a  $\beta'$  during training. Instead we train with a fixed labeled dataset containing (latent) objects  $z_{i}$  rendered as instances  $\{\mathbf{x}_{ij}\}$  under a small but variable set  $B_{i}$  of observed settings  $\{\beta_{ij}\}$ . We show that direct end-to-end training of a combined likelihood training settles on easy local minima, and fails to provide good recourse. Training them stage wise also is challenging; we list some of these. For  $f_{\theta}$ , training on the entire dataset may be suboptimal since instances in poor settings, where recourse will be asked, may mislead decisions on good instances. For  $g_{\phi}$ , we have no direct supervision of good  $\beta$  for a given  $(\mathbf{x}_{ij}, \beta_{ij})$ . For  $\pi$ , simple heuristics like choosing to recourse examples where  $f_{\theta}$  has low confidence does not guarantee improved accuracy. Our training strategy employs careful scheduling and decoupling of the training of the three modules via proxy functions. This achieves substantial gains over simple end-to-end training and existing methods of training classifiers with data selection based purely on noise [17, 1, 3, 9, 11, 14, 21, 27].  
+(iii) Characterization of recourse conditions. We provide theoretical characterizations to identify the circumstances under which recourse will enhance prediction accuracy. Specifically, we show that given an instance  $\mathbf{x}$ , if the recourse recommender suggests a modified environment that is close to at least one of the training environments resulting in an improved accuracy, then the recourse is beneficial. Moreover, if there exists some environment which improves the accuracy by a substantial margin, then even a modestly calibrated recourse recommender can lead to improved accuracy.
+
+# 2 Related work
+
+Our work is closely related to (i) Algorithmic recourse, (ii) Learning with triage and (iii) Machine learning with environment perturbation.  
+Algorithmic recourse: In recent years, there is an increasing interest in designing recourse on the instance space [26, 25, 20, 5, 28, 8, 22, 6] for a wide variety of applications. For example [26, 25] aim to improve fairness; [12, 4, 7] aim to train the models so that the predicted output is preserved under strategic perturbation of the instance space. Another line of work called strategic classification [4, 12, 7] deals with applying causal interventions to instances. However, these work learn the recourse action on the instance space, whereas, our goal is to design recourse action on the observed environment. An additional challenge in our setting is that the impact of the environment on the instance is latent and we do not assume presence of enough labeled data to learn a generative model for complex real-world instances under different environments.  
+Learning with triage: A recent line of work [17, 1, 3, 9, 11, 14, 21, 27] aims to learn when to outsource a subset of instances to human and assign the rest of the examples to machine so that machine and human together achieve superior performance than what they would have achieved independently. However, in our problem, humans do not participate in prediction task but they only generate new instances under the recommended environments.
+
+![](images/3af63c230487e0ab63cf41b51ea42849365cb05fb074f6608823e0304b218149.jpg)  
+Figure 1: Architecture of Proposed Approach. The chair image on the top does not need recourse and attains the correct label from  $f_{\theta}$ . However, the bottom image obtains the correct label only after recourse.
+
+Machine learning under environment perturbations: Machine learning models are sensitive to environments under which data is generated [10, 24]. For example [10], show that simple parametric perturbations on the Shapenet dataset can flip class labels. In another related work [15] suggests interventions on the environment using policy gradients to train a recourse model. However, they assume the availability of a human through out the training loop to generate data in an on-demand basis. We make no such assumptions and train with a fixed labeled dataset.
+
+# 3 Proposed approach
+
+In this section, we first formally present our problem, present our training methodology, and then theoretically characterize the settings under which recourse is possible.
+
+Problem formulation Let  $\mathcal{Z}$  denote a space of objects,  $\mathcal{B}$  denote a space of environment settings which could be real-valued or discrete or mixed, and  $\mathcal{X}$  denote a space of instances obtained via a latent physical process  $Z: \mathcal{Z} \times \mathcal{B} \to \mathcal{X}$ . Given a latent object  $z \in \mathcal{Z}$  and an environment setting  $\beta \in \mathcal{B}$ , we get an instance  $\mathbf{x} \in \mathcal{X} = \mathbb{R}^{d_x}$  i.e.,  $\mathbf{x} = Z(z, \beta)$ . Each object  $z$  has a label  $y \in \mathcal{Y}$  with  $|\mathcal{Y}| = K$ . We are interested in inferring the object's label using a trained classifier  $f_{\theta}$ . During training, for each of the latent set of objects  $\{z_i\}_{i \in D}$ , we are given a true label  $y_i$  and for a small set of settings  $B_i \subset \mathcal{B}$ , we are given instance  $\{\mathbf{x}_{ij}\}_{j \in B_i}$ . Thus, we view the training data as a set of examples  $\{y_i, \{\mathbf{x}_{ij}, \beta_{ij}\}_{j \in B_i}\}_{i \in D}$ . We use  $V$  to index all the examples, i.e.,  $V = \cup_{i \in D} \{\{i\} \times B_i\}$ . As stated earlier, our goal is to design a recourse mechanism that given a representation  $\mathbf{x}$  obtained of a latent object  $z$  under given settings  $\beta$  will recommend an alternative  $\beta'$  if the resultant  $\mathbf{x}' = Z(z, \beta')$  is expected to yield more accurate prediction under  $f_{\theta}$ . Note that  $Z$  is not accessible to us during training and we assume in this work that it is difficult to learn  $Z$  or infer  $z$  from the available labeled data  $D$ . Our goal instead is to use  $D$  to learn both  $f_{\theta}$  and the recourse mechanism.
+
+# 3.1 Training RECOURSENET
+
+RECOURSENET consists of three components:
+
+1. A classifier  $f_{\theta} : \mathcal{X} \times \mathcal{Y} \to [0,1]$  which aims to capture the likelihood of the label  $y$  given an instance  $\mathbf{x}$ , i.e.  $f_{\theta}(y|\mathbf{x})$  approximates  $\operatorname*{Pr}(y|\mathbf{x})$ .  
+2. A recourse recommender network  $g_{\phi}:\mathcal{X}\times \mathcal{B}\times \mathcal{B}\to [0,1]$ , that suggests a modified environment  $\beta^{\prime}\sim g_{\phi}(\bullet |\mathbf{x},\beta)$  such that if the user (via  $Z$ ) were to regenerate a new instance  $\mathbf{x}'$  using  $\beta^\prime$  the classifier is likely to provide higher accuracy.  
+3. A recourse trigger network  $\pi : \mathcal{X} \times \mathcal{B} \to \{0,1\}$  which is a binary decision function. Here,  $\pi(\mathbf{x},\beta) = 1$  indicates that we decide to perform recourse on the environment and the  $\beta'$  suggested by  $g_{\phi}$  should be used to regenerate the instance.
+
+Training objective. Given a set of examples with  $\{y_{i},\{\mathbf{x}_{ij},\beta_{ij}\}_{j\in B_i}\}_{i\in D}$ , we aim to find  $\theta, \phi$  and  $\pi$  by solving the following optimization problem:
+
+$$
+\begin{array}{l} \max  _ {\theta , \phi , \pi} \sum_ {i \in D} \left[ (1 - \pi \left(\mathbf {x} _ {i j}, \boldsymbol {\beta} _ {i j}\right)) \log f _ {\theta} \left(y _ {i} \mid \mathbf {x} _ {i j}\right) \right. \\ \left. + \pi \left(\mathbf {x} _ {i j}, \beta_ {i j}\right) \log f _ {\theta} \left(y _ {i} \mid Z \left(z _ {i}, \operatorname {a r g m a x} _ {\beta} g _ {\phi} \left(\beta \mid \mathbf {x} _ {i j}, \beta_ {i j}\right)\right)\right) \right] \tag {1} \\ \end{array}
+$$
+
+$$
+\text {s u b j e c t} \sum_ {i \in D, j \in B} \pi \left(\mathbf {x} _ {i j}\right) \leq b, \text {a n d} \pi \left(\mathbf {x} _ {i j}, \beta_ {i j}\right) \in \{0, 1 \} \tag {2}
+$$
+
+Here,  $b$  indicates the maximum number of examples which can undergo recourse. The first term in the objective (1)  $(1 - \pi (\bullet ,\bullet))f_{\theta}(\bullet |\bullet)$  accounts for examples that do not need recourse and the second term  $\pi (\bullet ,\bullet)f_{\theta}(\bullet |\bullet)$  accounts for those that need recourse. End to end training of the optimization problem (1)—(2) is challenging since we do not have an analytical form of  $\beta$  and training such a process will be difficult. We propose to train the three components  $f_{\theta},g_{\phi},\pi$  in a carefully designed three-stage process that we describe next.
+
+Training the classifier  $f_{\theta}$ . Training  $f_{\theta}$  on the entire training data may be sub-optimal because instances in poor settings would be subject to recourse, and the classifier should instead focus on instances after recourse as the above training objective suggests. For training  $f_{\theta}$  first we eschew the involvement of  $Z$  and  $g_{\phi}$  from the training objective (1) by noting that  $\pi(\mathbf{x}_{ij}, \boldsymbol{\beta}_{ij}) = 1$  only if  $f_{\theta}(y_i | Z(z_i, \operatorname{argmax}_{\boldsymbol{\beta}} g_{\phi}(\boldsymbol{\beta} | \mathbf{x}_{ij}, \boldsymbol{\beta}_{ij})) \geq f_{\theta}(y_i | \mathbf{x}_{ij})$ . Therefore, we replace the term  $Z(z_i, \operatorname{argmax}_{\boldsymbol{\beta}} g_{\phi}(\boldsymbol{\beta} | \mathbf{x}_{ij}, \boldsymbol{\beta}_{ij}))$  with some instance  $(\mathbf{x}_{ir}, \boldsymbol{\beta}_{ir})$  for some  $r \in B_i$  of the same object  $z_i$  such that the predicted classification accuracy on  $\mathbf{x}_{ir}$  is better than the original instance  $\mathbf{x}_{ij}$  by a certain margin  $\Delta$ . Specifically, given  $(\mathbf{x}_{ij}, \boldsymbol{\beta}_{ij})$ , we first define  $\mathrm{Rec}_{\Delta}(\theta, \mathbf{x}_{ij}, y_i)$  as the set of environments which would improve the log-likelihood of the gold label by at least a margin  $\Delta$  i.e.,
+
+$$
+\operatorname {R e c} _ {\Delta} (\theta , \mathbf {x} _ {i j}, y _ {i}) = \{\boldsymbol {\beta} ^ {\prime} \in B _ {i} \mid \log f _ {\theta} (y _ {i} \mid Z (z _ {i}, \boldsymbol {\beta} ^ {\prime})) > \log f _ {\theta} (y _ {i} \mid \mathbf {x} _ {i j}) + \Delta \} \tag {3}
+$$
+
+and then we pose the following training problem to learn  $\theta$ .
+
+$$
+\max_{\theta ,\pi}\sum_{\substack{i\in D\\ j\in B_{i}}}\Bigg[  (1 - \pi (\mathbf{x}_{ij},\boldsymbol{\beta}_{ij}))\log f_{\theta}(y_{i}\mid \mathbf{x}_{ij}) + \pi (\mathbf{x}_{ij},\boldsymbol{\beta}_{ij})\max_{\boldsymbol{\beta}_{ir}\in \operatorname{Rec}_{\Delta}(\theta ,\mathbf{x}_{ij},y_{i})}\log f_{\theta}(y_{i}\mid \mathbf{x}_{ir})\Bigg]
+$$
+
+$$
+\text {s u b j e c t} \sum_ {i \in D, j \in B _ {i}} \pi \left(\mathbf {x} _ {i j}, \boldsymbol {\beta} _ {i j}\right) \leq b, \text {a n d} \pi \left(\mathbf {x} _ {i j}, \boldsymbol {\beta} _ {i j}\right) \in \{0, 1 \}. \tag {4}
+$$
+
+Since our budget is limited, one needs to spend it on only those instances which not only suffer from poor accuracy, but can also lead to new instances that promote  $f_{\theta}$  to predict the correct label. The presence of a non-zero margin  $\Delta$  ensures such a condition. In Section 3.2, we provide the conditions under which such a recourse set will exist.
+
+Given  $\pi (\mathbf{x}_{ij},\boldsymbol {\beta}_{ij})\in \{0,1\}$ , we first define the set  $R = \{(i,j)\mid \pi (\mathbf{x}_{ij},\boldsymbol {\beta}_{ij}) = 1\}$ . Then, we can write the objective (4) as
+
+$$
+\max  _ {\theta , R: | R | \leq b} F (\theta , R) = \sum_ {(i, j) \notin R} \log f _ {\theta} \left(y _ {i} \mid \mathbf {x} _ {i j}\right) + \sum_ {(i, j) \in R} \max  _ {\boldsymbol {\beta} _ {i r} \in \operatorname {R e c} _ {\Delta} (\theta , \mathbf {x} _ {i j}, y _ {i})} \log f _ {\theta} \left(y _ {i} \mid \mathbf {x} _ {i r}\right) \tag {5}
+$$
+
+which gives us the problem of subset selection in conjunction with parameter estimation. Note that the involvement of  $R$  as an optimization variable renders the above problem challenging even if  $\log f_{\theta}(y|\mathbf{x})$  is concave in  $\theta$ . Thus, we resort to a greedy algorithm [16, 3, 13, 29] to solve this optimization problem (summarized in Algorithm 1). It is an iterative routine, which picks up an instance  $(\mathbf{x}_{ij},\beta_{ij},y_i)$  at every iteration which will maximize the training objective. Given an update  $R$  at step  $k\leq b$ , it chooses a candidate instance  $(i,j)$  which maximizes  $F(\theta^{k}(R\cup \{(i,j)\}),R\cup \{(i,j)\})$  where  $\theta (S) = \max_{\theta}F(\theta ,S)$ . We would like to highlight that, by definition of the set  $\mathrm{Rec}_{\Delta}$ , inclusion of  $(i,j)$  in  $R$  either improves the log-likelihood or keeps it at the same value obtained in the previous iteration. Formally, we can say that  $F(\theta^{k + 1}(R\cup \{(i,j)\})\geq F(\theta^{k}(R\cup \{(i,j)\})$
+
+Learning  $g_{\phi}$ . Our overall objective (1) is not differentiable with respect to  $\phi$  because of the  $\operatorname{argmax}_{\beta} g_{\phi}(\bullet)$  input to  $f_{\theta}$  and the unknown  $Z$ . We first get rid of the  $\operatorname{argmax}$  term via the following
+
+Algorithm 1: Greedy algorithm  
+Require: The set of all instances  $V = \cup_{i\in D}(i,B_i)$  , the budget  $b$    
+1:  $R\gets \emptyset$    
+2:  $\theta^0 (\emptyset)\leftarrow \mathrm{TRAIN}(F(\bullet ,\emptyset))$    
+3: for  $k\in [b]$  do   
+4: for  $(i,j)\in V\backslash R$  do   
+5:  $\mathcal{L}[(i,j)] =$ $F(\theta^{k}(R\cup \{(i,j)\}),R\cup \{(i,j)\})$    
+6: end for   
+7:  $(i^{*},j^{*})\gets \mathrm{argmax}_{(i,j)\in V\backslash R}\mathcal{L}[(i,j)]$    
+8:  $R\gets R\cup \{(i^{*},j^{*})\}$    
+9:  $\theta^{k + 1}(R)\gets \mathrm{TRAIN}(F(\bullet ,R))$    
+10: end for   
+11: Return  $R,\theta^{*}(R)$
+
+Algorithm 2: RECOURSENET  
+Require: The set of all instances  $V = \cup_{i\in D}(i,B_i)$  , the budget  $b,\delta$  1: INITIALIZE  $(f_{\theta},g_{\phi})$    
+2:  $\hat{\theta},R\gets \mathrm{GREEDYALGORITHM}(V,b,f_{\theta})$    
+3:  $\hat{\phi}\gets$  TRAINRECOURSERCOMMENDER(V,  $D_{\delta},g_{\phi})$  // Solve (8)   
+4:  $\pi \gets$  COMPUTERECOURSETRIGGER(  $\hat{\phi},\hat{\theta},V)$  // Use Eq. (9)   
+5: Return  $\hat{\theta},\hat{\phi},\pi$
+
+157 approximation:
+
+$$
+\begin{array}{l} \max_{\boldsymbol {\phi}}\sum_{\substack{i\in D,j\in B_{i}\\ \pi (\mathbf{x}_{ij}) = 1}}f_{\theta}(y_{i}\mid Z(z_{i},\operatorname{argmax}_{\boldsymbol{\beta}}g_{\boldsymbol{\phi}}(\boldsymbol {\beta}\mid \mathbf{x}_{ij},\boldsymbol{\beta}_{ij}))) \\ \approx \max  _ {\phi} \sum_ {i \in D, j \in B _ {i}} \max  _ {\pi (\mathbf {x} _ {i j}) = 1} \log \left[ f _ {\theta} \left(y _ {i} \mid Z \left(z _ {i}, \boldsymbol {\beta}\right)\right) g _ {\phi} \left(\boldsymbol {\beta} \mid \mathbf {x} _ {i j}, \boldsymbol {\beta} _ {i j}\right) \right] \tag {6} \\ \end{array}
+$$
+
+Next we account for the unknown  $Z$  by partitioning all examples in  $D$  into two groups — the set  $D_{\delta}$  which contains groups with at least one instance where good  $\beta$ s are available (i.e.  $\max_r f_\theta(y_i | \mathbf{x}_{ir}) > 1 - \delta$ ), and the remaining objects  $D - D_{\delta}$  where no good instances are available. For the instances in  $D_{\delta}$ , we can jointly train  $\theta$  and  $\phi$ . For the ones in  $D - D_{\delta}$  we replace the loss achievable by a given  $\beta$  by an estimated accuracy  $f^{\mathrm{CF}}(y_i | \mathbf{x}_{ij}, \beta)$  of getting the correct prediction when the setting  $\beta_{ij}$  is replaced by  $\beta$  for the  $i$ -th object. We estimate this quantity as the average classifier accuracy on objects with similar labels and under settings  $\beta$ . In general, for continuous  $y, \beta$  this can be fit as a regression problem. For discrete  $y, \beta$ , simple fractional estimates were found adequate in our experiments. We compute these estimates by defining the following counterfactual:
+
+$$
+f ^ {\mathrm {C F}} (y \mid \mathbf {x}, \boldsymbol {\beta}) = \frac {\sum_ {(i , j) \in V} \mathbb {I} [ y _ {i} = y , \boldsymbol {\beta} _ {i j} = \boldsymbol {\beta} ] f _ {\hat {\theta}} (y _ {i} = y \mid \mathbf {x} _ {i j})}{\sum_ {(i , j) \in V} \mathbb {I} [ y _ {i} = y , \boldsymbol {\beta} _ {i j} = \boldsymbol {\beta} ]} \tag {7}
+$$
+
+where  $\mathbb{I}[\bullet]$  is an indicator function and  $\theta$  is the output of Algorithm 1. With these two terms, we maximize the following objective:
+
+$$
+\begin{array}{l} \max  _ {\phi} \sum_ {i \in D _ {\delta}} \sum_ {j \in B _ {i}} \max  _ {r \in B _ {i}} \log \left[ f _ {\theta} \left(y _ {i} \mid \mathbf {x} _ {i r}\right) g _ {\phi} \left(\boldsymbol {\beta} _ {i r} \mid \mathbf {x} _ {i j}, \boldsymbol {\beta} _ {i j}\right) \right] \\ + \sum_ {i \notin D _ {\delta}} \sum_ {j \in B _ {i}} \log g _ {\phi} \left(\operatorname {a r g m a x} _ {\boldsymbol {\beta}} f ^ {\mathrm {C F}} \left(y _ {i} \mid \mathbf {x} _ {i j}, \boldsymbol {\beta}\right) \mid \mathbf {x} _ {i j}, \boldsymbol {\beta} _ {i j}\right) \tag {8} \\ \end{array}
+$$
+
+169 Computation of  $\pi$ . Our training objective (1) suggests that  $\pi(\mathbf{x}_{ij}, \boldsymbol{\beta}_{ij}) = 1$  only if  $f_{\theta}(y_i | \mathbf{x}_{ij}) < f_{\theta}(y_i | \mathbf{x}_{ij}^{\prime} = Z(z_i, \boldsymbol{\beta}_{ij}^{\prime}))$  where  $\boldsymbol{\beta}_{ij}^{\prime} = \operatorname{argmax}_{\boldsymbol{\beta}} g_{\hat{\phi}}(\boldsymbol{\beta} | \mathbf{x}_{ij}, \boldsymbol{\beta}_{ij})$ . Since the recourse budget is limited, we cannot obtain  $\mathbf{x}_{ij}^{\prime}$  for all instances to compute  $\pi$ . Therefore, in practice, we use  $f^{\mathrm{CF}}(\bullet | \mathbf{x}_{ij}, \boldsymbol{\beta}_{ij}^{\prime})$  as a proxy for  $f_{\theta}(\bullet | \mathbf{x}_{ij}^{\prime} = Z(z_i, \boldsymbol{\beta}_{ij}^{\prime}))$ . Specifically, we set
+
+$$
+\pi \left(\mathbf {x} _ {i j}, \boldsymbol {\beta} _ {i j}\right) = \mathbb {I} \left[ f ^ {\mathrm {C F}} \left(y _ {\max } \mid \mathbf {x} _ {i j}, \boldsymbol {\beta} _ {i j} ^ {\prime}\right) > f _ {\hat {\theta}} \left(y _ {\max } \mid \mathbf {x} _ {i j}\right) \right] \text {w h e r e} y _ {\max } = \underset {y} {\operatorname {a r g m a x}} f _ {\hat {\theta}} (y \mid \mathbf {x} _ {i j}) \tag {9}
+$$
+
+173 We call our overall training method as RECOURSENET, which is summarized in Algorithm 2.
+
+<table><tr><td>Dataset</td><td>#Train objects (|D|)</td><td>#Renderings (|Bi|)</td><td>Environment (B)</td><td>#Classes |y|</td><td>#Test objects</td></tr><tr><td>Synthetic</td><td>1200</td><td>8</td><td>6 dimensional bit-mask</td><td>4</td><td>200</td></tr><tr><td>Shapenet-Large</td><td>2500</td><td>4</td><td>.view, zoom level, light color)</td><td>10</td><td>800</td></tr><tr><td>Shapenet-Small</td><td>2500</td><td>2</td><td>.view, zoom level, light color)</td><td>10</td><td>800</td></tr><tr><td>Speech Commands</td><td>2000</td><td>5</td><td>(pitch, speed, noise)</td><td>20</td><td>60</td></tr></table>
+
+Table 1: Summary of datasets used in our work. #Train objects denotes the number of (latent) objects that are available in the dataset. #Renderings denotes the number of environment settings under which each such object  $z_{i}$  is rendered. Environment column denotes the different parameters that can be instantiated to render  $\mathbf{x}$  from  $z$ . Finally, #Test objects denotes the number of (latent) objects available in the test dataset. Unlike train, we render each test object under all possible environments  $\beta \in \mathcal{B}$ .
+
+# 3.2 Theoretical Analysis
+
+In this section we present the conditions on  $\theta, \phi, \pi$  under which RECOURSENET will be successful in providing recourse. The proofs of the propositions are given in Appendix B.
+
+Proposition 1 Assume that  $Z$  is  $L_{\beta}$ -Lipschitz with respect to  $\beta$ , the model  $\log f_{\theta}(y|\mathbf{x})$  is  $L_{x}$ -Lipschitz with respect to  $\mathbf{x}$ . Given  $i \in D$  and  $j \in B_i$ , if the set  $\mathrm{Rec}_{\Delta}(\theta, \mathbf{x}_{ij}, y_i)$  is non-empty and the recourse network  $g_{\phi}$  gives a modified  $\beta_{ij}'$  such that  $||\beta_{ij}' - \beta|| \leq \epsilon$  for some  $\beta \in \mathrm{Rec}_{\Delta}(\theta, \mathbf{x}_{ij}, y_i)$ , then, for  $\Delta > tL_xL_{\beta}\epsilon$  with  $t > 1$  we have:
+
+$$
+\log f _ {\theta} \left(y _ {i} \mid Z \left(z _ {i}, \beta_ {i j} ^ {\prime}\right)\right) > \log f _ {\theta} \left(y _ {i} \mid \mathbf {x} _ {i j}\right) + (1 - 1 / t) \Delta \tag {10}
+$$
+
+The above proposition suggests that as long as  $g_{\phi}(\bullet | \mathbf{x}_{ij}, \beta_{ij})$  is close to some  $\beta \in \mathrm{Rec}_{\Delta}(\theta, \mathbf{x}_{ij}, y_i)$ , then the accuracy provided by the classifier  $f_{\theta}$  improves. One of the key assumptions of this proposition is the non-emptiness of  $\mathrm{Rec}_{\Delta}(\theta, \mathbf{x}_{ij}, y_i)$ . In the following proposition, we find the requirements for such conditions in terms of the true classifier  $f_{\theta^*}$ .
+
+Proposition 2 Let us assume that the true model is  $f_{\theta^*}$  i.e.,  $y \sim f_{\theta^*}(y|\mathbf{x})$ ,  $\log f_{\theta}(y|\mathbf{x})$  is  $L_{\theta}$ -Lipschitz w.r.t.  $\theta$  and  $||\theta - \theta^*|| \leq \delta$ . Given  $i \in D$  and  $j \in B_i$ , if  $\operatorname{Rec}_{\Delta_0}(\theta^*, \mathbf{x}_{ij}, y_i)$  is non-empty for some  $\Delta_0 > 2L_{\theta}\delta$ , then  $\operatorname{Rec}_{\Delta}(\theta, \mathbf{x}_{ij}, y_i)$  is non-empty for  $\Delta < \Delta_0 - 2L_{\theta}\delta$ . Moreover, if the recourse network  $g_{\phi}$  gives us a modified  $\beta'_{ij}$  such that  $||\beta'_{ij} - \beta|| \leq \epsilon$  for some  $\beta \in \operatorname{Rec}_{\Delta}(\theta, \mathbf{x}_{ij}, y_i)$ , then, for  $\Delta_0 > 2L_{\theta}\delta + tL_{\beta}L_x\epsilon$  with  $t > 1$  we have:
+
+$$
+\log f _ {\theta} \left(y _ {i} \mid Z \left(z _ {i}, \beta_ {i j} ^ {\prime}\right)\right) > \log f _ {\theta} \left(y _ {i} \mid \mathbf {x} _ {i j}\right) + (1 - 1 / t) \left(\Delta_ {0} - 2 L _ {\theta} \delta\right) \tag {11}
+$$
+
+# 4 Experiments
+
+In this section, we experiment with several datasets to show that RECOURSENET's training strategy outperforms existing methods or simpler alternatives. Our experiments are designed to answer the following research questions through empirical evaluations:
+
+1. In the training of  $f_{\theta}$ , what is the impact ofsubsetting the training set when compared with default alternatives like training on all available labeled data.  
+2. In deciding when to trigger recourse, how important is to model expected accuracy under recourse, in contrast to just asking recourse on low confidence examples?  
+3. In training the recourse recommender, how important was it distinguish between objects with and without good  $\beta$ s? During inference, how important is it to make instance specific recourse recommendations instead of a single ideal beta?  
+We could not find any existing benchmark that records different environment settings under which objects are rendered. Thus we generate datasets that admit causal relationship across  $\mathbf{x}, \beta, z$  and  $y$  as follows: we first sample a class label from the class prior  $y \sim \operatorname{Pr}(\bullet)$  and then we choose  $B_i$  settings by sampling  $\beta$ s drawn from a  $\operatorname{Pr}(\beta \mid y)$ . Finally we generate  $\mathbf{x}$  under the  $B_i$  chosen environments. We generate 4 datasets of varying complexities as shown in the Table 1.
+
+Shapenet-Large. Shapenet consists of three dimensional models of many kinds of objects that can be mapped into two dimensional pixel maps under various environments [2]. Each environment
+
+Table 2: Comparing classification accuracy under different strategies forsubseting data for training  $f_{\theta}$  at  $100\%$  recourse.  
+
+<table><tr><td>Training Data</td><td>Shapenet-Large</td><td>Shapenel-Small</td><td>Speech-Commands</td></tr><tr><td>Full-data (Baseline)</td><td>72.9</td><td>63.0</td><td>51.5</td></tr><tr><td>One-shot subsetting</td><td>72.5</td><td>65.7</td><td>54.3</td></tr><tr><td>Iterative greedy (Ours)</td><td>75.9</td><td>76.3</td><td>65.3</td></tr></table>
+
+$\beta$  represents the camera settings provided by (view, zoom level, light color). We select  $|\mathcal{V}| = 10$  classes and draw 250 objects from each class to obtain a total of  $|D| = 2500$  objects. For each object, we draw  $B_{i} = 4$  different  $\beta$ s from a set of  $|\mathcal{B}| = 9$  possible camera settings and render them under these settings. Among the four environments, we ensure that each  $z_{i}$  contains a  $\beta$  that renders it properly with a probability 0.8. To make the task challenging, we corrupt the rendered  $\mathbf{x}_{ij}$  using various kinds of noise from the image corruptions library<sup>1</sup>. In particular, we corrupt  $\mathbf{x}_{ij}$  if  $\beta_{ij}$  is not a good choice for  $z_{i}$  so as to make learning of such settings difficult for  $f_{\theta}$ .
+
+Shapenet-Small: This dataset differs from Shapenet-Large in the number of environments under which each object is rendered. Among the two environments, each  $z_{i}$  contains a good  $\beta$  with probability 0.6. We highlight that this dataset is much more challenging than Shapenet-Large because of scarcity in the number of objects that contain at least one  $\mathbf{x}_{ij}$  that produces good accuracy. This makes the objective (6) difficult to learn. Here also we add noise to  $\mathbf{x}_{ij}$  in a manner similar to Shapenet-Large. The test set for both Shapenet-Large and Shapenet-Small is same, and contains 80 objects per class; each of them rendered under all 9 camera settings  $\beta$  thus contributing to 7200 images.
+
+Speech Commands Dataset. This dataset consists of textual commands that can be converted to speech signals under different environments  $\beta$  defined by instantiations to (pitch, speed, noise) sampled from  $\mathcal{B}$  with  $|\mathcal{B}| = 60$ . We select  $|\mathcal{V}| = 20$  commonly used Alexa commands and render them to speech signals with a frame width of 0.5 seconds using Google text to speech library  $^2$ . These speech signals are then processed into 2D mel spectrograms [23]. In particular, the training dataset consists of  $2000z_{i}$  rendered under  $|B_i| = 5$  environments each thereby contributing to 10000 samples. The test set contains  $200z_{i}$ s rendered under all  $60\beta$ s thereby containing 12000 speech samples.
+
+Further details about dataset preparation and results on synthetic datasets are provided in Appendix C.
+
+# 4.1 RQ1: Impact ofsubsetting the training data in learning  $f_{\theta}$
+
+We compare our iterative greedy proposal to train  $f_{\theta}$  with two other baselines as follows:
+
+1. Full data: Here we train  $f_{\theta}$  over the entire training dataset.  
+2. One-shot **subsetting:** Here we subset all  $b$  examples at once unlike our iterative algorithm 1. i.e. we compute  $\mathcal{L}(i,j)$  for all samples given  $\theta^0 (\emptyset)$  and choose the ones that incur top- $b$  values into  $R$  and then maximize  $F(\bullet, R)$  to obtain  $\hat{\theta}$ .
+
+Table 2 shows the recourse accuracy of  $f_{\theta}$  at  $100\%$  recourse when learned under these three different training strategies. For all three methods we use  $g_{\phi}$  trained using our objective (8) to obtain recourse recommendations. We observe that our iterative greedy algorithm to train  $f_{\theta}$  consistently outperforms the model trained with the entire data. This establishes the importance of training classifiers differently when recourse is an option. A classifier that is trained only on instances with 'good' environment settings is more suitable for classification under recourse, even in data hungry deep learning models. Simply resetting by removing the worst  $b$  instances is significantly worse than our iterative algorithm.
+
+# 4.2 RQ2: Impact of modelling expected recourse accuracy in triggering recourse
+
+We compare our proposal for  $f_{\theta}$  and  $\pi$  with two other baselines adapted from the work of [21].
+
+![](images/dfd022d31f88cca4c223d983afb890b3faddc00f018d3c4d6bb6e0b10ae36280.jpg)
+
+![](images/50aa89ee8947721605a0aa8c1690c20b5ca2e415bd040d7bc5bee98c98d60927.jpg)  
+(a) Shapenet-Large
+
+![](images/25c8575966bb54bd1e6bc03a8af534ea3117b57fc0b4aba8ee7f32e7266ef465.jpg)  
+(b) Shapenet-Small
+
+![](images/89aa6180c5b30999cf08832d413b273205c78b8b10dc2565c9c25b79fe465d64.jpg)  
+Figure 2: Variation of classification accuracy after recourse against the budget  $b$ , i.e., the maximum number of instances selected for recourse for both Shapenet-Large and Shapenet-Small datasets for the recourse trigger  $\pi$  provided by RECOURSENET, score based recourse and full automation recourse.  
+(c) Speech Commands
+
+1. Score based recourse trigger: Here, we train  $f_{\theta}$  on entire training data. Then during inference, given a budget  $b$ , we seek recourse on the least  $b$  confident predictions of  $f_{\theta}$ .  
+2. Full automation based recourse trigger: Here also, we train  $f_{\theta}$  on entire training data. Then for recourse trigger, we learn an error predictor trained on the loss incurred by the classifier on training examples. During inference, for a budget  $b$ , we seek recourse on those examples that incur the  $b$  highest predicted losses. Details about the neural architecture of the error predictor is provided in Appendix C.
+
+Figure 2 summarizes the comparison of recourse trigger  $\pi$  against the two baselines proposed in literature [21]. Unlike our greedy algorithm, the other two methods propose full training for  $f_{\theta}$  and thus they are inferior at  $0\%$  recourse. The steepness in the recourse accuracy for our proposed  $\pi$  is more in comparison to other baselines because it prioritizes not just the instances that suffer from poor accuracy for recourse but also the ones that respond better to recourse by means of modelling the expected recourse accuracy. Our method suggests recourse only when the expected gains that we calculate using  $f^{\mathrm{CF}}$  is positive, and performs much better than methods based purely on current classifier confidence or an estimate of the confidence.
+
+# 4.3 RQ3: Impact of treating objects with and without good renderings differently in learning  $g_{\phi}$
+
+We compare our  $g_{\phi}$  against three other methods as follows.
+
+1. Only  $\phi$ : This model takes a form similar to  $g_{\phi}$  and learns to recourse the instances  $(i,j)$  that incur top  $50\%$  losses in the training data to  $\beta_{ir}$  where  $r$  is obtained from  $\mathrm{argmax}_r f_\theta(y_i \mid \mathbf{x}_{ir})$ .  
+2. RECOURSENET without  $f^{\mathbf{CF}}$ : This model trains  $g_{\phi}$  using the objective (6).  
+3. Constant: This method entails a constant  $\beta$  recommendation independent of the features  $(\mathbf{x},\beta)$ . We select constant  $\beta$  as the one that achieves the best training accuracy.
+
+To elucidate the importance of finding the objects that have no good  $\beta$  and thereby including them in the set  $D - D_{\delta}$  in the  $g_{\phi}$  objective (8), we perform an ablation study of our proposal with three other baselines as listed above. The results presented in Figure 3 show the following observations. (1) Only  $\phi$  model performs poorly on Shapenet-Large and performs on par with Constant method on other datasets. Because many groups do not have  $\beta$  that produce good accuracy, Only  $\phi$  receives noisy supervision during training. (2) RECOURSENET without  $f^{\mathrm{CF}}$  achieves a decent fit on Shapenet-Large and Speech datasets but fails miserably on the Shapenet-Small dataset. Because Shapenet-Small has  $|B_i| = 2$ , we can see that  $50\%$  examples force the recourse recommender to predict the input  $\beta$  as is under the joint objective (6). This renders identity function as a strong local maxima which the model struggles to avoid during training. This brittleness of RECOURSENET without  $f^{\mathrm{CF}}$  to objects with no good  $\beta$  motivates the need for our current objective 8. (3) The supervision provided by the  $f^{\mathrm{CF}}$  term in our  $g_{\phi}$  objective (8) guides instances in the set  $D - D_{\delta}$  and thus achieves better recourse accuracy. (4) One good competitor to our  $g_{\phi}$  across the datasets is constant prediction which brings
+
+![](images/74581143ee6b8c512702fc4e4b63ad7a19af9bb95aa703fec14f246abfe50e95.jpg)
+
+![](images/a0b828333709060bfcc85ebcffe5c1200da2f652e1f574dab37b7ae57fabc54f.jpg)  
+(a) Shapenet-Large.
+
+![](images/620133ac52a9c189d6869e706fc54a6525950f9cc2bac016e5e013c8555528ae.jpg)  
+(b) Shapenet-Small.
+
+![](images/2948846a54c47cb03c485bac4f942236fede332a7be0d5fde19c852ec39f60ee.jpg)  
+(c) Speech Commands.
+
+![](images/c22d7b953becccdd0b12a455bb8bf1ba0dede3211554bd7f7fd2f3c2c55717c5.jpg)  
+Figure 3: Variation of classification accuracy after recourse against the budget  $b$ , i.e., the maximum number of instances selected for recourse for both Shapenet-Large and Shapenet-Small datasets for the recourse recommender  $g_{\phi}$  provided by RECOURSENET, Only  $\phi$ , RECOURSENET with  $f^{\mathrm{CF}}$  and Constant.
+
+![](images/869df1baa5cdb73d8262f87cdadb3ee71ed749d0d90960d6ef6ae3f1d7ddc489.jpg)  
+(a) Shapenet-Large
+
+![](images/fe68a955ee65d887e7ae31887dc387cd4125c416759ffce34844752f6f978da2.jpg)  
+(b) Shapenet-Small
+
+![](images/64e5543a6255b44c55f62b77068d210d82826833ddcd9f66e992de7c4ecf172b.jpg)  
+Figure 4: Accuracy of different recourse recommenders for different classes.  
+(c) Speech Commands
+
+us to the other half of RQ3 – Is an instance independent constant  $\beta$  recourse recommendation always advisable?
+
+We try to answer this question by probing the average error incurred by these methods for each class. Figure 4 summarizes the results for 5 classes which shows that unlike baselines, our  $g_{\phi}$  garners modest to best accuracy across classes consistently. The performance of constant method in the Shapanet datasets can be attributed to the fact that many objects in it admit a unique good  $\beta$ . However, this is not the case in the speech dataset because we found no one  $\beta$  to dominate in performance across classes. As a result, the recourse accuracy suffers in the speech dataset with constant  $\beta$  prediction. Thus we conclude by saying that it is always good to make instance specific recourse recommendations.
+
+# 5 Conclusions
+
+In this paper, we proposed RECOURSENET that aims to make recourse recommendations to instances that are sampled from poor environments. RECOURSENET has three components: (1) classifier  $f_{\theta}$ , (2) Recourse recommender  $g_{\phi}$  and (3) Recourse trigger  $\pi$ . We learn these components using a novel three level training objective without having to model the latent physical generator  $Z$ . Moreover, our theoretical results assure that under mild conditions, recourse is beneficial. These results in effect, press the need for recourse in order to obtain quality predictions from a model. The experiments on synthetic and real-world datasets show that our method outperforms several baselines.
+
+Our work opens up many areas of future work. It would be interesting to extend RECOURSENET to regimes where the space where the environment variable  $\beta$ s can be continuous. In medical applications, some environment variables may be restrictive and can cause harm to the patients.
+
+# References
+
+[1] Gagan Bansal, Besmira Nushi, Ece Kamar, Eric Horvitz, and Daniel S. Weld. Optimizing AI for Teamwork. In AAAI, 2021.  
+[2] Angel X. Chang, Thomas Funkhouser, Leonidas Guibas, Pat Hanrahan, Qixing Huang, Zimo Li, Silvio Savarese, Manolis Savva, Shuran Song, Hao Su, Jianxiong Xiao, Li Yi, and Fisher Yu. Shapenet: An information-rich 3d model repository, 2015.  
+[3] Abir De, Paramita Koley, Niloy Ganguly, and Manuel Gomez-Rodriguez. Regression under human assistance. In Proceedings of the AAAI Conference on Artificial Intelligence, volume 34, pages 2611-2620, 2020.  
+[4] Moritz Hardt, Nimrod Megiddo, Christos Papadimitriou, and Mary Wootters. Strategic classification. In Proceedings of the 2016 ACM conference on innovations in theoretical computer science, pages 111-122, 2016.  
+[5] Moritz Hardt, Eric Price, and Nati Srebro. Equality of opportunity in supervised learning. In Advances in neural information processing systems, pages 3315-3323, 2016.  
+[6] Amir-Hossein Karimi, Gilles Barthe, Bernhard Scholkopf, and Isabel Valera. A survey of algorithmic recourse: definitions, formulations, solutions, and prospects, 2021.  
+[7] Sagi Levanon and Nir Rosenfeld. Strategic classification made practical. arXiv preprint arXiv:2103.01826, 2021.  
+[8] Arnaud Van Looveren and Janis Klaise. Interpretable counterfactual explanations guided by prototypes, 2019.  
+[9] Brian Lubars and Chenhao Tan. Ask not what ai can do, but what ai should do: Towards a framework of task delegability. Advances in Neural Information Processing Systems, 32, 2019.  
+[10] Spandan Madan, Tomotake Sasaki, Tzu-Mao Li, Xavier Boix, and Hanspeter Pfister. Small in-distribution changes in 3d perspective and lighting fool both cnns and transformers. arXiv preprint arXiv:2106.16198, 2021.  
+[11] David Madras, Toni Pitassi, and Richard Zemel. Predict responsibly: improving fairness and accuracy by learning to defer. Advances in Neural Information Processing Systems, 31, 2018.  
+[12] John Miller, Smitha Milli, and Moritz Hardt. Strategic adaptation to classifiers: A causal perspective. CoRR, abs/1910.10362, 2019.  
+[13] Baharan Mirzasoleiman, Ashwinkumar Badanidiyuru, Amin Karbasi, Jan Vondrák, and Andreas Krause. Lazier than lazy greedy. arXiv preprint arXiv:1409.7938, 2014.  
+[14] Hussein Mozannar and David Sontag. Consistent estimators for learning to defer to an expert. In International Conference on Machine Learning, pages 7076-7087. PMLR, 2020.  
+[15] Siddharth Nayak and Balaraman Ravindran. Reinforcement learning for improving object detection. In European Conference on Computer Vision, pages 149-161. Springer, 2020.  
+[16] George L Nemhauser, Laurence A Wolsey, and Marshall L Fisher. An analysis of approximations for maximizing submodular set functions-i. Mathematical programming, 1978.  
+[17] Nastaran Okati, Abir De, and Manuel Gomez-Rodriguez. Differentiable learning under triage, 2021.  
+[18] Godliver Owomugisha and Ernest Mwebaze. Machine learning for plant disease incidence and severity measurements from leaf images. In 2016 15th IEEE International Conference on Machine Learning and Applications (ICMLA), pages 158-163, 2016.  
+[19] Chunjong Park, Hung Ngo, Libby Rose Lavitt, Vincent Karuri, Shiven Bhatt, Peter Lubell-Doughtie, Anuraj H. Shankar, Leonard Ndwiga, Victor Osoti, Juliana K. Wambua, Philip Bejon, Lynette Isabella Ochola-Oyier, Monique Chilver, Nigel Stocks, Victoria Lyon, Barry R. Lutz, Matthew Thompson, Alex Mariakakis, and Shwetak Patel. The design and evaluation of a mobile system for rapid diagnostic test interpretation. Proc. ACM Interact. Mob. Wearable Ubiquitous Technol., 5(1), mar 2021.
+
+[20] Rafael Poyiadzi, Kacper Sokol, Raul Santos-Rodriguez, Tijl De Bie, and Peter Flach. Face: Feasible and actionable counterfactual explanations. In Proceedings of the AAAI/ACM Conference on AI, Ethics, and Society, AIES '20, page 344-350, New York, NY, USA, 2020. Association for Computing Machinery.  
+[21] Maithra Raghu, Katy Blumer, Greg Corrado, Jon Kleinberg, Ziad Obermeyer, and Sendhil Mullainathan. The algorithmic automation problem: Prediction, triage, and human effort. arXiv preprint arXiv:1903.12220, 2019.  
+[22] Alexis Ross, Himabindu Lakkaraju, and Osbert Bastani. Learning models for actionable recourse. In A. Beygelzimer, Y. Dauphin, P. Liang, and J. Wortman Vaughan, editors, Advances in Neural Information Processing Systems, 2021.  
+[23] Jonathan Shen, Ruoming Pang, Ron J Weiss, Mike Schuster, Navdeep Jaitly, Zongheng Yang, Zhifeng Chen, Yu Zhang, Yuxuan Wang, Rj Skerrv-Ryan, et al. Natural tts synthesis by conditioning wavenet on mel spectrogram predictions. In 2018 IEEE international conference on acoustics, speech and signal processing (ICASSP), pages 4779-4783. IEEE, 2018.  
+[24] Rohan Taori, Achal Dave, Vaishaal Shankar, Nicholas Carlini, Benjamin Recht, and Ludwig Schmidt. Measuring robustness to natural distribution shifts in image classification, 2020.  
+[25] Berk Ustun, Alexander Spangher, and Yang Liu. Actionable recourse in linear classification. In Proceedings of the Conference on Fairness, Accountability, and Transparency, pages 10-19, 2019.  
+[26] S. Wachter, Brent D. Mittelstadt, and Chris Russell. Counterfactual explanations without opening the black box: Automated decisions and the gdpr. European Economics: Microeconomics & Industrial Organization eJournal, 2017.  
+[27] Bryan Wilder, Eric Horvitz, and Ece Kamar. Learning to complement humans. In *IJCAI*, 2020.  
+[28] Jiaming Zeng, Berk Ustun, and Cynthia. Interpretable classification models for recidivism prediction. Journal of the Royal Statistical Society: Series A (Statistics in Society), 3(180):689-722, 2017.  
+[29] Ping Zhang, Rishabh Iyer, Ashish Tendulkar, Gaurav Aggarwal, and Abir De. Learning to select exogenous events for marked temporal point process. Advances in Neural Information Processing Systems, 34, 2021.

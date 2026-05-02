@@ -1,0 +1,247 @@
+# SPARSE WATERMARKING IN LLMS WITH ENHANCED TEXT QUALITY
+
+Anonymous authors
+
+Paper under double-blind review
+
+# ABSTRACT
+
+With the widespread adoption of Large Language Models (LLMs), concerns about potential misuse have emerged. To this end, watermarking has been adapted to LLM, enabling a simple and effective way to detect and monitor generated text. However, while the existing methods can differentiate between watermarked and unwatermarked text with high accuracy, they often face a trade-off between the quality of the generated text and the effectiveness of the watermarking process. In this work, we present a novel type of LLM watermark, Sparse Watermark, which aims to mitigate this trade-off by applying watermarks to a small subset of generated tokens distributed across the text. To demonstrate this type of watermark, we introduce SpARK, a Sparse WaterMARK method that achieves sparsity by anchoring watermarked tokens to words that have specific Part-of-Speech (POS) tags. Our experimental results demonstrate that the proposed watermarking scheme achieves high detectability while generating text that outperforms previous LLM watermarking methods in quality across various tasks.
+
+# 1 INTRODUCTION
+
+Recent advancements in Large Language Models (LLM) have shown exceptional performance in a multitude of tasks. From generating documents to answering questions on different topics, LLMs such as Meta's Llama (Touvron et al., 2023) and OpenAI's GPT (OpenAI, 2023) have become the foundation upon which many AI applications are built (Luo et al., 2023; Brohan et al., 2023; Luo et al., 2024; Huang et al., 2023). However, as these applications increase in their capabilities and accessibility, a growing risk of them being used for malicious purposes, such as generating fake news and being used for cheating assignments, becomes increasingly apparent.
+
+With the ever-increasing problem of LLMs being misused, monitoring the generated text and its usage has become an increasingly crucial direction for research. One effective way for tracking the usage of generated text is by watermarking (Kirchenbauer et al., 2023; 2024; Zhao et al., 2024) - embedding imperceptible information into the generated text, thereby making it easier to detect and track for potential misuse. Recent studies have demonstrated the effectiveness and versatility of watermarks in embedding ownership information into generated text and distinguishing it from non-watermarked and human-written text (Krishna et al., 2023).
+
+In addition to distinguishing between watermarked and non-watermarked texts, watermarking methods must also preserve the original text quality after embedding the secret information. However, prior works generally agree that there is a trade-off between the quality of the watermarked text and the strength of its watermark. For instance, Kirchenbauer et al. (2023) illustrates this trade-off by introducing a parameter that adjusts the extent to which their method affects the model's logits. By tuning this parameter, they demonstrate the balance between the quality of the generated text and the robustness of the watermark.
+
+In this paper, we aim to circumvent the trade-off between watermark strength and text quality by proposing a watermarking method that augments only a portion of the generated text and checks for that portion of the text for watermark information. The main concept is illustrated in Figure 1. We show that by watermarking only a subset of the generated text, we can still maintain high detectability while minimizing the watermark's impact on the text quality. Our hypothesis is that while prior methods verify a watermark by checking every token within a text, the same effect can be achieved
+
+![](images/7f65647fd8868b80a7c010e59be0e238b4c3a637b6775762ad3608563790b97d.jpg)  
+Figure 1: An overview of our proposed SpARK. For each generation step  $t$ , if the previous word belongs to the POS of interest (i.e., Verb), we divide the vocabulary into Green/Red list and restrict sampling from the Green list. Otherwise, we generate the next token with the original probability.
+
+by checking only a specific portion if the locations of the watermarked elements are known. This helps preserve the quality of the generated text by keeping a large portion of the original generated text while still successfully embedding the secret information. Our contributions can be summarized as follows:
+
+- We introduce Sparse Watermark, a novel category of watermarking methods for LLMs that are designed to preserve both text quality and detectability by selectively watermarking and verifying only a subset of the generated text.  
+- We propose SpARK, a method of watermarking using Part-of-Speech (POS) tags, embedding and detecting watermarks based on the POS tags of words within the generated text.  
+- Through extensive experiments on SpARK, we demonstrate that Sparse Watermark effectively maintains high text quality generated by LLMs and watermark detectability, outperforming several previous methods across various generation tasks.
+
+# 2 RELATED WORKS
+
+AI-generated text detection. The methods for monitoring the usage of AI-generated text can be generally classified into two main categories: AI text detection and watermarking. Of these, watermarking has proven to be more reliable and effective for distinguishing between generated and human-written text, as well as between watermarked and unwatermarked generated text (Krishna et al., 2023). In addition, as companies and research communities strive to close the gap between LLM-generated and human-written texts, relying solely on AI text detection of the original text will become increasingly challenging. The main objective of LLM watermarking is to inject secret information imperceptible to humans into the generated text, which can later be verified by using watermark detection mechanisms (Kirchenbauer et al., 2024; Zhao et al., 2024; Kirchenbauer et al., 2024; Liu et al., 2024a; Gu et al., 2024).
+
+Text watermarking for LLM. One common approach of text watermarking for LLMs focused on distorting the next token probability distribution of the language model. This is achieved by randomly dividing the vocabulary into two disjoint sets named Green list and Red List, and then promoting the generation of only tokens in the Green list with a bias parameter  $\delta$  (Kirchenbauer et al., 2023). During detection, a detector with the secret key could recover the watermarked distribution and use a statistical test to verify the presence of the watermark.
+
+Recent works have attempted to improve LLM watermarking from the perspective of advancing robustness and security. For instance, Zhao et al. (2024); Kirchenbauer et al. (2024) explored various schemes to enhance the robustness of watermarks. Zhao et al. (2024) illustrated that leveraging a fixed Green list enabled watermarking to be resilient against various types of attacks. Kirchenbauer et al. (2024) explored several hashing schemes for improved robustness. Training-based watermarks are also designed, where one study improved the robustness of the watermark using the semantics of previously generated tokens (Liu et al., 2024b). Liu et al. (2024a) proposed to train two neural networks for text generation and watermark detection to create an unforgettable watermark. Lee et al. (2023) introduced entropy thresholding for code generation as watermarking low-entropy tokens could compromise the correctness of the generated sequences.
+
+Effects of watermark on text quality. However, while these recent works have considerably enhanced the robustness, detectability, and unforgeability of LLM watermarking, it is generally agreed that there is a trade-off between the quality of the watermarked text and the strength of its watermark. The distribution shift introduced in Kirchenbauer et al. (2023) enhances the detectability of the watermark, but it simultaneously allows less likely tokens to be generated, thus affecting the intrinsic quality of the generated text. Recently, Tu et al. (2023) introduced a benchmark method of several LLM watermarking algorithms and verified this deterioration of text quality. To minimize the impact on the generation quality, Christ et al. (2023); Kuditipudi et al. (2023) proposed to embed the watermark during the token sampling process, thus inducing zero distortion to the probability distribution of the LLM. However, in practice, the sampling-based schemes struggled to produce a detectable watermark for low-temperature settings (Piet et al., 2023). Huo et al. (2024) introduced a multi-objective optimization method to dynamically generate bias parameters and Green list ratio to achieve both detectability and semantic coherence. In contrast, our approach, SpARK, emphasizes preserving the strength and semantic integrity of generated text by leveraging the innate structure of natural language, eliminating the need for training.
+
+# 3 PROPOSED METHOD
+
+# 3.1 NOTATIONS AND PRELIMINARIES
+
+We first introduce the notations used in this paper. Let  $\mathcal{M}$  be an autoregressive language model that takes a tokenized prompt  $\mathbf{x}_{\mathrm{prompt}} = \{x_{-N},\dots,x_{-2},x_{-1}\}$  and output a sequence of tokens that simulate natural responses. At generation step  $t$ , the input for the language model  $\mathcal{M}$  is combined sequences of tokens  $\mathbf{x}_{\mathrm{prompt}}$  and the tokens  $\mathbf{x} = \{x_0,\dots,x_{t - 1}\}$  previously generated by  $\mathcal{M}$  in the previous steps. The language model  $\mathcal{M}$  then takes the input and outputs a probability distribution of the next token over the vocabulary  $\mathcal{V}$  of the language model:  $P_{\mathcal{M}}(x_{-N},\dots,x_{t - 1}) = (P_{\mathcal{M}}(v|x_{-N},\dots,x_{t - 1})|v\in \mathcal{V})$ .
+
+According to Kirchenbauer et al. (2024), watermark algorithms are defined using four parameters. The hash function  $\mathcal{H}$  generates a pseudo-random hash using the context of the generated text with context width  $h$ , the fraction of green list token  $\gamma$ , and the magnitude of the logit bias  $\delta$ . After the watermarked text is generated, one can use the same parameters to calculate and retrieve a set of green tokens  $s$  in the generated text. We then use this set to calculate the statistical significance of  $|s|$  number of green tokens that appeared in the generated text with token length  $T$ . We can use a one-proportion z-test assuming the null hypothesis  $\mathcal{H}_0$  which states: "The text sequence is generated without a watermark". The z-score is then calculated as
+
+$$
+z = \frac {| s | - \gamma T}{\gamma \sqrt {(1 - \gamma) T}}. \tag {1}
+$$
+
+If a text sequence's  $z$ -score surpasses a defined threshold, we can confidently determine that the text has been watermarked.
+
+# 3.2 THREAT MODELS
+
+In this paper, we consider the same threat model as in prior works (Kirchenbauer et al., 2023; Zhao et al., 2024; Liu et al., 2024a). The goal is to embed a watermark for LLM so that users can later verify if certain texts are generated by the LLM. We assume that the adversary is aware of the presence of watermarks and attempts to evade the watermark detection when using the LLM. The adversary
+
+Algorithm 1 Text Generation with SpARK  
+```txt
+1: procedure GENERATETEXT(xprompt)  
+2: for  $t = 0,1,\ldots$  do  
+3:  $P_{\mathcal{M}}(t)\gets \mathcal{M}(x_{-N},\dots ,x_{t - 1})$   
+4: hash  $\leftarrow \mathcal{H}(x_{-N},\dots ,x_{t - 1})$   
+5:  $P_{\mathcal{M}}(t)\gets \mathrm{POSWatermark}(\mathbf{x}_{\mathrm{prompt}},P_{\mathcal{M}}(t),hash)$   
+6:  $\mathbf{x}_{\mathrm{prompt}}(t)\gets \mathrm{Sample}(G)$   
+7: end for  
+8: return  $\mathbf{x}_{\mathrm{prompt}}[0:t]$   
+9: end procedure
+```
+
+Algorithm 2 SpARK Encoding  
+```txt
+1: procedure POSWATERMARK(x,  $P_{\mathcal{M}}$ , hash)  
+2:  $T \gets$  Convert tokens x to normal text  
+3:  $W \gets$  Last word of  $T$   
+4:  $P_{\mathrm{tag}} \gets \mathrm{POS}(W, T)$   
+5: if  $P_{\mathrm{tag}} \in I$  then  
+6:  $G \gets$  GenerateGreenList(T, hash)  
+7:  $P_{\mathcal{M}} \gets \mathrm{ApplyGreenList}(P_{\mathcal{M}}, G)$   
+8: end if  
+9: return  $P_{\mathcal{M}}$   
+10: end procedure
+```
+
+could have access to both open-source and private (non-watermarked) language models to produce an alternate text. Consistent with prior works, we only consider attacks such that the modifications are able to erase the watermark without significantly deviating from the original semantics of the texts.
+
+# 3.3 SPARSE WATERMARKING USING POS TAGS
+
+In previous works, most watermarking techniques attempt to encode watermark information into each token in the generated text. As the strength of the watermarking method increases, more tokens are adversely affected, which decreases the quality of the generated text (Kirchenbauer et al., 2023). We aim to improve the text quality by watermarking the generated text sparsely, which however is non-trivial. Attempting to watermark sparsely without knowing the location of the watermarked elements would be akin to using the previous watermark methods with low strength. This is due to the statistical test also including the non-watermarked portions of the generated text. To this end, by isolating and conducting the statistical test specifically on the watermarked portions of the generated text, we can significantly enhance detectability while maintaining higher text quality compared to using previous methods with stronger watermarking.
+
+We utilize the Universal Part-of-Speech (POS) tags (Petrov et al., 2012) that exist in the generated text to mark the positions of the watermarked tokens in the text sequence. Specifically, during the generation process, we select the positions to watermark based on the POS of tokens that have been generated, allowing the watermark positions to be tied to the sentence structure. This makes the watermark more resilient to insertions/deletions of tokens in the generated text and also makes it easier to extract the watermarked portion of the text using the POS tags.
+
+Before using SpARK, we first select a list of POS tags  $I$  to be used for watermarking. When the text generation process starts, as described in Algorithm 1, we verify when the model has generated a full word by determining if the next token with the highest probability is the start of a new word. While LLMs sample the next token differently with different sampling schemes, using this strategy could consistently inform us when a full word has been generated, without the need to backtrack during the generation process. Once a full word is produced by the language model, we obtain its POS tag  $P_{\text{tag}}$ , and watermark the next token only if  $P_{\text{tag}} \in I$ . We choose to watermark the token next to the word with chosen POS tags, as watermarking those words directly would not guarantee it to have the same POS tag after being watermarked, leading to inconsistencies. By using words that have a selected POS as an anchor, we can limit the number of watermarked tokens in the generated text and position
+
+Algorithm 3 SpARK Watermark Detection  
+```txt
+procedure DETECTWATERMARK(y,I,hash)  
+ $s = 0$ $T = 0$   
+for  $i = 1,2,\ldots |\mathbf{y}|$  do  
+ $P_{\text{tag}} \gets \text{POS}(\mathbf{y}[i],\mathbf{y}[:i])$   
+if  $P_{\text{tag}} \in I$  then  
+ $T = T + 1$   
+next_token  $\leftarrow$  NextToken(y[:i],i)  
+ $G \gets \text{GenerateGreenList}(\mathbf{y}[:i],\text{hash})$   
+if next_token  $\in G$  then  
+ $s = s + 1$   
+end if  
+end if  
+end for  
+ $z \gets \frac{s - \gamma T}{\gamma\sqrt{(1 - \gamma)T}}$   
+if  $z > \text{threshold}$  then  
+return True  
+else  
+return False  
+end if  
+end procedure
+```
+
+them to be easily relocated when decoding. We outline the process of watermarking using POS tags in Algorithm 2.
+
+To watermark the next token, we used a similar process and hashing scheme as described in Kirchenbauer et al. (2023), partitioning the vocabulary using  $\gamma$  and limiting the generations of new tokens to a subset of the vocabulary, the Green list  $G$ . While dividing the vocabulary, we only select tokens that start a new word, as it would not affect the previous words and their POS tags, making the decoding process more consistent. Additionally, our method does not use  $\delta$  to increase the bias for generating green list tokens, but instead, we restrict the model to only select from the Green list. This helps the encoding process to utilize all of the tokens it has access to, as it can only watermark a small portion of the generated text.
+
+# 3.4 SPARK WATERMARK DETECTION
+
+Since SpARK watermark is sparse, we identify the specific positions we have selected for the watermark to ensure that the unwatermarked portions of the text are not considered in the z-score calculation. This process would preserve the strength of the sparse watermark. We first identify the words whose POS tags are in the list  $I$  and select the next token. These selected tokens are the ones we would watermark during the encoding process and thus would be in the Green list  $G$ . At each of the selected token positions, we recover the  $G$  using the hashing scheme mentioned in the encoding process and check if the token in that position is in  $G$ . We then calculate the statistical significance of the number of green tokens that appeared in the generated text, as shown in Equation 1. However, as we only apply the watermark to tokens after the words with a specific POS,  $T$  (the total number of tokens) would be replaced by the number of tokens in the watermarked positions. The watermark detection step is presented in Algorithm 3.
+
+# 4 EXPERIMENTS
+
+# 4.1 EXPERIMENTAL SETUP
+
+We choose Llama2-7b, a popular open-sourced LLM that has been instruction-tuned to align with human preference, as our baseline model for testing the watermarking methods. In addition, we also conduct the experiments on Phi-3, a 3.8 billion language model that has been shown to outperform
+
+![](images/c27cd30e3e4ade6fdb11a18292c589a0da4035f2cdc092163cad8decc9ff8bd2.jpg)  
+Figure 2: True Positive Rate (TPR) for each method on the selected dataset, generated using Llama2-7b with different hyper-parameters for  $\gamma$  and  $\delta$ .
+
+bigger LLMs on several benchmarks. We compare the performance of our proposed method against four LLM watermarking techniques:
+
+- Hard watermark: The initial watermark method proposed by Kirchenbauer et al. (2023). This method restricts the model to only generating a portion of the vocabulary, referred to as the Green list, and uses the statistical test to detect the watermark.  
+- LeftHash watermark (Soft watermark): A watermark method proposed by Kirchenbauer et al. (2023). The method is similar to Hard watermark, but this watermark encourages the model to generate tokens from the Green list by adding a constant  $\gamma$  to the output logit, instead of restricting the model. We refer to this method as LeftHash to differentiate this method from another method proposed in Kirchenbauer et al. (2024).  
+- SelfHash watermark: A watermark method proposed by Kirchenbauer et al. (2024). This watermark method is similar to LeftHash watermark, as it encourages the model to generate from the Green list as well. The main difference is that this watermarking method chooses tokens that contain themselves in the Green list during hashing, increasing robustness.  
+- Unigram watermark: A watermark method that simplifies the watermark process by utilizing a fixed Green list used to watermark text (Zhao et al., 2024). Their work shows that this restriction increased the robustness of the watermark.
+
+To validate the detectability and the quality of the text generated by the watermark methods, we used an experiment setting similar to WaterBench (Tu et al., 2023). This benchmark procedure aims to measure both the quality of the generated text and its detectability. We focused the experiment only on the long-answer datasets, following the same setting as in prior works of LLM watermarking (Kirchenbauer et al., 2024; Gu et al., 2024). We conduct the same hyper-parameter search experiments on long-answer datasets to find parameters that are more suitable to watermark these long text answers. The watermarking strength results are shown in Figure 2. During the hyper-parameter search, we select the parameters that are close to the original parameters of each method and have a True Positive Rate of greater than 0.99.
+
+To summarize, we select the ELI5 (Explained Like I'm 5) dataset (Fan et al., 2019) and the FinanceQA dataset (Maia et al., 2018), both of which focus on short questions with long answers, along with MultiNews (Fabbri et al., 2019) and QMSum (Zhong et al., 2021), which focuses on text summarization. These four datasets are grouped into two tasks, Long-form QA and Summarization. We then conduct a hyper-parameter search by evaluating the TPR of each method using different hyper-parameters. As shown in Figure 2, the strength of the watermark increases as  $\gamma$  decreases and  $\delta$  increases. The figure also shows that most watermark methods achieved over 0.99 of TPR if  $\delta$  is high enough, which helps us choose a  $\gamma$  that is close to the original parameters of each method. We then select hyper-parameters closest to the original paper, while having a TPR of over 0.99.
+
+For SpARK, we selected three POS tags for the main experiment: Verb, Noun, and Determiner. This is because, based on Table 7, these three tags have  $100\%$  of document frequency. We selected  $\gamma = 0.05$  for the SpARK, to increase the strength of each watermark toke. By choosing a small  $\gamma$ ,
+
+Table 1: Comparison of True Positive Rate (TPR), True Negative Rate (TNR), ROUGE-L score (R-L), decrease in percentage point of ROUGE-L score  $(\Delta)$  and the semantic similarity of watermarked and non-watermarked text (Sem.) of different watermarking algorithms, evaluated on Llama-2 model. The best and second-best performances are in bold and underline, respectively.  
+
+<table><tr><td rowspan="2"></td><td colspan="4">Long-form QA</td><td colspan="4">Summarization</td><td rowspan="2">Sem.</td></tr><tr><td>TPR</td><td>TNR</td><td>R-L</td><td>Δ</td><td>TPR</td><td>TNR</td><td>R-L</td><td>Δ</td></tr><tr><td>No Watermark</td><td>-</td><td>-</td><td>21.59</td><td>-</td><td>-</td><td>-</td><td>23.47</td><td>-</td><td>-</td></tr><tr><td>Hard</td><td>100.0</td><td>100.0</td><td>16.76</td><td>↓22.37%</td><td>100.0</td><td>100.0</td><td>16.63</td><td>↓29.14%</td><td>0.765</td></tr><tr><td>LeftHash</td><td>100.0</td><td>100.0</td><td>14.55</td><td>↓32.61%</td><td>99.5</td><td>99.5</td><td>13.33</td><td>↓43.20%</td><td>0.693</td></tr><tr><td>SelfHash</td><td>99.5</td><td>93.5</td><td>12.75</td><td>↓40.94%</td><td>100.0</td><td>96.0</td><td>12.54</td><td>↓46.57%</td><td>0.663</td></tr><tr><td>Unigram</td><td>99.8</td><td>100.0</td><td>11.43</td><td>↓47.06%</td><td>99.3</td><td>100.0</td><td>11.53</td><td>↓50.87%</td><td>0.652</td></tr><tr><td>SpARK - Verb</td><td>100.0</td><td>99.0</td><td>18.87</td><td>↓12.60%</td><td>100.0</td><td>99.5</td><td>20.95</td><td>↓10.74%</td><td>0.836</td></tr><tr><td>SpARK - Noun</td><td>100.0</td><td>99.5</td><td>18.48</td><td>↓14.40%</td><td>100.0</td><td>100.0</td><td>18.39</td><td>↓21.64%</td><td>0.794</td></tr><tr><td>SpARK - Determiner</td><td>100.0</td><td>98.8</td><td>19.20</td><td>↓11.07%</td><td>100.0</td><td>98.0</td><td>20.89</td><td>↓10.99%</td><td>0.814</td></tr></table>
+
+Table 2: Comparison of True Positive Rate (TPR), True Negative Rate (TNR), ROUGE-L score (R-L), decrease in percentage point of ROUGE-L score  $(\Delta)$  and the semantic similarity of watermarked and non-watermarked text (Sem.) of different watermarking algorithms evaluated on Phi-3 model. The best and second-best performances are in bold and underline, respectively.  
+
+<table><tr><td rowspan="2"></td><td colspan="4">Long-form QA</td><td colspan="4">Summarization</td><td rowspan="2">Sem.</td></tr><tr><td>TPR</td><td>TNR</td><td>R-L</td><td>Δ</td><td>TPR</td><td>TNR</td><td>R-L</td><td>Δ</td></tr><tr><td>No Watermark</td><td>-</td><td>-</td><td>22.62</td><td>-</td><td>-</td><td>-</td><td>23.37</td><td>-</td><td>-</td></tr><tr><td>Hard</td><td>100.0</td><td>100.0</td><td>15.19</td><td>↓32.83%</td><td>100.0</td><td>100.0</td><td>11.22</td><td>↓52.01%</td><td>0.567</td></tr><tr><td>LeftHash</td><td>100.0</td><td>100.0</td><td>19.55</td><td>↓15.34%</td><td>99.3</td><td>99.5</td><td>15.71</td><td>↓32.78%</td><td>0.779</td></tr><tr><td>SelfHash</td><td>100.0</td><td>97.0</td><td>19.51</td><td>↓13.75%</td><td>99.8</td><td>99.5</td><td>16.85</td><td>↓27.90%</td><td>0.806</td></tr><tr><td>Unigram</td><td>100.0</td><td>100.0</td><td>7.74</td><td>↓65.77%</td><td>99.8</td><td>100.0</td><td>7.04</td><td>↓69.88%</td><td>0.425</td></tr><tr><td>SpARK- Verb</td><td>100.0</td><td>99.0</td><td>21.45</td><td>↓5.17%</td><td>100.0</td><td>99.5</td><td>20.87</td><td>↓10.72%</td><td>0.850</td></tr><tr><td>SpARK- Noun</td><td>99.5</td><td>99.5</td><td>19.46</td><td>↓13.95%</td><td>100.0</td><td>100.0</td><td>18.27</td><td>↓21.84%</td><td>0.787</td></tr><tr><td>SpARK-Determiner</td><td>99.5</td><td>98.8</td><td>21.18</td><td>↓6.37%</td><td>100.0</td><td>99.0</td><td>20.86</td><td>↓10.74%</td><td>0.829</td></tr></table>
+
+we demonstrate that SpARK, and Sparse Watermark in general, can match other baseline methods in detectability, while also maintaining higher generation performance. We also provide the results containing the TPR of SpARK under different POS tags and  $\gamma$ .
+
+# 4.2 RESULTS OF DETECTABILITY AND TEXT QUALITY
+
+As mentioned in Section 4.1, we conduct evaluations with parameters that achieved greater than 0.99 TPR and close to the original parameters of each method. We report the results of the watermarks' performance in Table 1 and Table 2.
+
+Overall, the detection performance of the baseline watermark method is high, having above  $99\%$  True Positive Rate and True Negative Rate in both tasks. In addition, tuning the parameter for long-answer text increased the generation performance of all watermark methods without degrading their detectability. Compared to the baseline watermark methods, our SpARK achieved similar detection performance, while consistently achieving the highest generation performance in both tasks. On Llama2-7b, all three of the SpARK variants using different POS tags reached the top 3 spots in terms of generation performance. When using any of SpARK variants, the ROUGE-L score of the original model would only be reduced by at most  $21.64\%$ . In contrast, the performance of other watermarks would decrease that down by at least  $22\%$  and at most more than  $50\%$ . SpARK also has the highest semantic similarity between the non-watermarked text and watermarked text, with the highest being 0.836 and the lowest being 0.794.
+
+The same phenomenon can be seen on Phi-3, as SpARK maintains the generated text quality while having a high TPR compared to other methods. For long-form QA, the Verb and Determiner variants of SpARK only reduce the quality by roughly  $5\%$  and  $6\%$ , respectively, while other baseline
+
+![](images/54c76bfeafeb92f2f90cdf43b2479c83ce6f4bcba57a517b60873a4c9a7de522.jpg)  
+(a) Long-form QA
+
+![](images/d3144e7c637ef476a71e017cacedaf37fe88ed42bf2bdd20f0deee2ee15002f6.jpg)  
+Figure 3: Perplexity of the generated text for each watermark method in two main tasks.  
+(b) Summarization Task
+
+watermark decreases the quality of the text by at least  $13.75\%$  (SelfHash) and at most  $65.77\%$  (Unigram). For summarization, SpARK maintains the best generation text with all three variants, degrading the quality by at most  $21.8\%$ , where other methods admit decreases of at least  $27\%$ . In terms of semantic similarity between watermarked and non-watermarked text, SpARK maintains the highest positions, with the Verb variant achieving 0.850 and Determiner 0.829.
+
+We also plot the perplexity of each watermark method's responses to measure the generation quality. We used Llama2-13b as the oracle model to measure perplexity, as it is a more powerful language model that is publicly available, similar to the methodology in Jovanovic et al. (2024). As shown in Figure 3, SpARK consistently achieves the lowest perplexity across both tasks when using the Determiner POS tag. Notably, our method also induces lower variance in perplexity, indicating that it not only maintains low perplexity but does so with greater consistency, emphasizing the stability of our approach compared to existing watermarking techniques.
+
+In summary, SpARK's results show that sparse watermark can produce better-generated texts, both in terms of semantic similarity and task performance, while having the same detectability. By watermarking a small portion of text sparsely and anchoring each watermarked token with a POS tag, SpARK can preserve the performance and similarity of the generated text, while maintaining detectability by focusing the detection on smaller sets of tokens.
+
+# 4.3 RESULTS OF ROBUSTNESS AGAINST ATTACKS
+
+As malicious players have the capability of modifying a sequence of watermarked text to evade the detector, watermarking methods need to ensure that the watermark is resilient against changes to the text. In order to illustrate the robustness of our proposed approach, we consider two realistic types of attack: substitution attack and paraphrasing attack.
+
+Substitution Attack. For the substitution attack, a specified proportion of the text (equal to some  $r$  tokens) is replaced with its corresponding synonyms. However, it is worth noting that a simplistic replacement can compromise the semantic coherence of the sentence. Following the settings described in (Wang et al., 2024), we iteratively masked a random token that has yet to be modified and then utilized RoBERTa-Large to generate candidates for replacement. To ensure the semantic integrity of the perturbed text, we only select to substitute a new token if the difference in logits of the new token and the original is higher than our pre-defined threshold, which we set to be -1. If there is no token that satisfies the preceding requirement, we proceed to mask a different token. The process is terminated when we have replaced  $r$  tokens or we have attempted to replace  $3r$  tokens.
+
+Table 3 demonstrates the resilience of our method against substitution attack, with SpARK achieving good performance for the  $10\%$  scenario. For higher rates such as  $30\%$ , the robustness of our proposed method lessens, but they remain competitive with other watermarking algorithms. Detailed results of each dataset for the substitution attack can be found in Table 10 and Table 11 of the Appendix.
+
+Paraphrasing Attack. In addition to the substitution attack, we also evaluate the robustness of our proposed method against paraphrasing attack using DIPPER (Krishna et al., 2023). DIPPER is an
+
+Table 3: Average True Positive Rate under two settings of attacks: synonym substitution and paraphrasing (DIPPER), evaluated on Llama2-7b and Phi-3. The best and second-best performances are in bold and underline, respectively.  
+
+<table><tr><td rowspan="2">Language Model</td><td rowspan="2">Method</td><td colspan="3">Substitution Attack</td><td colspan="2">DIPPER</td></tr><tr><td>10%</td><td>30%</td><td>50%</td><td>40L</td><td>40L-40O</td></tr><tr><td rowspan="7">Llama2-7b</td><td>Hard</td><td>99.6</td><td>90.6</td><td>51.1</td><td>53.0</td><td>41.0</td></tr><tr><td>LeftHash</td><td>99.8</td><td>99.0</td><td>83.9</td><td>71.4</td><td>64.1</td></tr><tr><td>SelfHash</td><td>99.8</td><td>98.1</td><td>92.3</td><td>75.0</td><td>69.5</td></tr><tr><td>Unigram</td><td>99.5</td><td>96.9</td><td>91.4</td><td>59.8</td><td>50.9</td></tr><tr><td>SpARK- Verb</td><td>99.8</td><td>96.3</td><td>72.4</td><td>54.3</td><td>43.5</td></tr><tr><td>SpARK- Noun</td><td>100.0</td><td>97.8</td><td>78.3</td><td>53.9</td><td>41.9</td></tr><tr><td>SpARK- Determiner</td><td>99.8</td><td>96.5</td><td>67.6</td><td>74.3</td><td>66.9</td></tr><tr><td rowspan="7">Phi-3</td><td>Hard</td><td>100.0</td><td>100.0</td><td>98.6</td><td>89.3</td><td>88.3</td></tr><tr><td>LeftHash</td><td>99.3</td><td>98.1</td><td>83.6</td><td>79.8</td><td>66.1</td></tr><tr><td>SelfHash</td><td>99.3</td><td>96.1</td><td>62.8</td><td>79.5</td><td>66.9</td></tr><tr><td>Unigram</td><td>99.9</td><td>99.6</td><td>99.3</td><td>89.1</td><td>88.6</td></tr><tr><td>SpARK- Verb</td><td>99.6</td><td>96.3</td><td>72.5</td><td>64.0</td><td>54.1</td></tr><tr><td>SpARK- Noun</td><td>99.4</td><td>97.5</td><td>80.6</td><td>71.5</td><td>59.1</td></tr><tr><td>SpARK- Determiner</td><td>99.6</td><td>96.8</td><td>76.6</td><td>87.1</td><td>82.4</td></tr></table>
+
+11B parameter model that has been specially fine-tuned from T5-XXL (Raffel et al., 2020) for the task of paraphrasing. It has been demonstrated to successfully evade multiple AI-generated text detectors while also preserving the general semantics of the sentence. We assess the performance of our watermarking schemes for two attack settings: 40L, where the lexical diversity is set to 40, and 40L-40O, where the lexical and order diversity are 40. With these configurations, DIPPER is able to produce a strong paraphrasing attack and maintain a high degree of semantic similarity with the original sentence.
+
+The results of the paraphrasing attacks are summarized in Table 3. When applied to Llama2-7b, the performance of SpARK with determiner is demonstrated to be near state-of-the-art in terms of robustness, achieving  $74.3\%$  and  $66.9\%$  in true positive rate, only 0.7 and 2.6 percentage points behind SelfHash, under 40L and 40L-40O paraphrasing, respectively. For Phi-3, SpARK can still achieve  $87.1\%$  and  $82.4\%$  for DIPPER, higher than both LeftHash and SelfHash. While Hard watermark and Unigram achieved higher robustness on Phi-3, their generated texts have the lowest scores compared to other methods, as shown in Table 2. In contrast, SpARK was able to achieve relatively high robustness against attacks while having the best results in terms of generated text on both Llama2-7b and Phi-3. The performance of each method for all datasets can be found in Table 12 and Table 13 of the Appendix.
+
+# 4.4 EMPIRICAL EFFECTS ON Z-SCORE AND TEXT QUALITY
+
+To demonstrate SpARK's ability to maintain both high detectability and preserve the semantic meaning of the non-watermarked generation, we provide an example of watermarking applied to an answer in QMSum using SelfHash and SpARK - Determiner. This table visually demonstrates the watermarked tokens and their corresponding list, with tokens found in the Red list represented in red, and tokens found in the Green list represented in green. As we can observe in Table 4, techniques like SelfHash aim to watermark every token when generating, while SpARK only focuses on watermarking only a fraction of the generated tokens. While SelfHash has a large Green list with  $\gamma = 0.25$ , the quality of the text being generated by SelfHash has a lower similarity, only (0.298) due to the number of tokens it encodes. SpARK, on the other hand, even when having a smaller green list ( $\gamma = 0.05$ ), the generated text has a higher semantic similarity than SelfHash (0.726), thanks to encoding fewer tokens. While SelfHash's generated text does have a higher  $z$ -score (16.99) compared to SpARK's 11.53, it is worth emphasizing that the number of tokens used in SpARK is a lot smaller. SpARK is able to maintain a similar level of detectability to SelfHash as seen in Section 4.2. Additional watermarked text examples from different watermark methods in different datasets can be found in Section K of the Appendix.
+
+Table 4: Examples from the QMSum dataset generated by Llama2-7b with no watermark (NW), with SelfHash, and with SpARK - Determiner (SPK-Det), respectively. Results of z-score and semantic similarity (Sem.) of each watermarking method are also reported. The hyper-parameter  $(\gamma, \delta)$  for SelfHash is (0.25, 10), and the hyper-parameter  $\gamma$  for SpARK is 0.05.  
+
+<table><tr><td>Prompt</td><td>[INST]You are given a meeting transcript and a query containing a question or instruction. Answer the query in one or more sentences.\nTranscript:\nUser Interface: ...\nQuery: What did the Marketing think of buttons when discussing the functional design of the remote control?\nAnswer:[/INST]</td><td>z-score</td><td>Sem.</td></tr><tr><td>NW</td><td>Based on the meeting transcript, the Marketing person suggested that there should be no buttons on the remote control, as most people only use a small number of buttons on their existing remote controls, and having too many buttons can be confusing. Instead, they proposed using a menu-based system or a single button for a menu.</td><td>-</td><td>-</td></tr><tr><td>SelfHash</td><td>At the meeting, the marketingperson suggested eliminating unnecessarybuttons on the remote controlimulating a more user-friend design. He also noted that people rarely uesevery featureson a remotecontrol anyway sothere&#x27;s &quot;Not enough crowd&quot; on the device mark the needed buton for a mewalmost all the time . Therefore , the Marketion believed the onerouse was to consider a more minimalinconvenie _ design f the product Marktng&#x27;s view was to focus the user expdria and keep the device slew a d simple... ...</td><td>16.99</td><td>0.298</td></tr><tr><td>SPK-Det</td><td>Based on the extract, the design manager expressed that the design project team should aim to create a remote control with fewer buttons than usual, as most people do not use their TV remote controls&#x27; full capacity. The Designer also suggested that a minimalist approach could be beneficial, with only one button for a shortcut menu</td><td>11.53</td><td>0.726</td></tr></table>
+
+# 5 CONCLUSION
+
+In this work, we propose SpARK, a novel watermark method for LLM, that encodes watermark information into the generated text, without degrading its quality. Different from other methods, this approach focuses on encoding a subset of tokens distributed sparsely throughout the generated text. By encoding a small subset of tokens in the generated text and focusing on those subsets for watermark detection, SpARK can minimize the impact of the watermark on the text quality while maintaining high detectability. Experimental results demonstrate the effectiveness of our SpARK in preserving the text quality, as evidenced by the ROUGE-L score and semantic similarity for four datasets compared to other methods. Despite watermarking significantly fewer tokens, our approach maintains competitive robustness against both substitution and paraphrasing attacks.
+
+# REFERENCES
+
+Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen Chebotar, Xi Chen, Krzysztof Choromanski, Tianli Ding, Danny Driess, Avinava Dubey, Chelsea Finn, Pete Florence, et al. Rt-2: Vision-language-action models transfer web knowledge to robotic control, 2023.  
+Miranda Christ, Sam Gunn, and Or Zamir. Undetectable watermarks for language models. Cryptology ePrint Archive, Paper 2023/763, 2023. URL https://eprint.iacr.org/2023/763. https://eprint.iacr.org/2023/763.  
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. BERT: Pre-training of deep bidirectional transformers for language understanding. In Jill Burstein, Christy Doran, and Thamar Solorio (eds.), Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers), pp. 4171–4186, Minneapolis, Minnesota, June 2019. Association for Computational Linguistics. doi: 10.18653/v1/N19-1423. URL https://aclanthology.org/N19-1423.  
+Alexander Fabbri, Irene Li, Tianwei She, Suyi Li, and Dragomir Radev. Multi-news: A large-scale multi-document summarization dataset and abstractive hierarchical model. In Anna
+
+Korhonen, David Traum, and Lluis Márquez (eds.), Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics, pp. 1074-1084, Florence, Italy, July 2019. Association for Computational Linguistics. doi: 10.18653/v1/P19-1102. URL https://aclanthology.org/P19-1102.  
+Angela Fan, Yacine Jernite, Ethan Perez, David Grangier, Jason Weston, and Michael Auli. ELI5: Long form question answering. In Anna Korhonen, David Traum, and Lluis Márquez (eds.), Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics, pp. 3558-3567, Florence, Italy, July 2019. Association for Computational Linguistics. doi: 10.18653/v1/P19-1346. URL https://aclanthology.org/P19-1346.  
+Tianyu Gao, Xingcheng Yao, and Danqi Chen. SimCSE: Simple contrastive learning of sentence embeddings. In Empirical Methods in Natural Language Processing (EMNLP), 2021.  
+Chenchen Gu, Xiang Lisa Li, Percy Liang, and Tatsunori Hashimoto. On the learnability of watermarks for language models. In The Twelfth International Conference on Learning Representations, 2024. URL https://openreview.net/forum?id=9k0krNzvlV.  
+Siyuan Huang, Zhengkai Jiang, Hao Dong, Yu Qiao, Peng Gao, and Hongsheng Li. Instruct2act: Mapping multi-modality instructions to robotic actions with large language model, 2023.  
+Mingjia Huo, Sai Ashish Somayajula, Youwei Liang, Ruisi Zhang, Farinaz Koushanfar, and Pengtao Xie. Token-specific watermarking with enhanced detectability and semantic coherence for large language models, 2024.  
+Nikola Jovanović, Robin Staab, and Martin Vechev. Watermark stealing in large language models. 2024.  
+John Kirchenbauer, Jonas Geiping, Yuxin Wen, Jonathan Katz, Ian Miers, and Tom Goldstein. A watermark for large language models. In Andreas Krause, Emma Brunskill, Kyunghyun Cho, Barbara Engelhardt, Sivan Sabato, and Jonathan Scarlett (eds.), Proceedings of the 40th International Conference on Machine Learning, volume 202 of Proceedings of Machine Learning Research, pp. 17061-17084. PMLR, 23-29 Jul 2023. URL https://proceedings.mlr.org. press/v202/kirchenbauer23a.html.  
+John Kirchenbauer, Jonas Geiping, Yuxin Wen, Manli Shu, Khalid Saifullah, Kezhi Kong, Kasun Fernando, Aniruddha Saha, Micah Goldblum, and Tom Goldstein. On the reliability of watermarks for large language models. In The Twelfth International Conference on Learning Representations, 2024. URL https://openreview.net/forum?id=DEJIDCmWoz.  
+Kalpesh Krishna, Yixiao Song, Marzena Karpinska, John Frederick Wieting, and Mohit Iyyer. Paraphrasing evades detectors of AI-generated text, but retrieval is an effective defense. In Thirty-seventh Conference on Neural Information Processing Systems, 2023. URL https://openreview.net/forum?id=WbFhFvjjKj.  
+Rohith Kuditipudi, John Thickstun, Tatsunori Hashimoto, and Percy Liang. Robust distortion-free watermarks for language models. arXiv preprint arXiv:2307.15593, 2023.  
+Taehyun Lee, Seokhee Hong, Jaewoo Ahn, Ilgee Hong, Hwaran Lee, Sangdoo Yun, Jamin Shin, and Gunhee Kim. Who wrote this code? watermarking for code generation, 2023.  
+Aiwei Liu, Leyi Pan, Xuming Hu, Shuang Li, Lijie Wen, Irwin King, and Philip S. Yu. An un forgeable publicly verifiable watermark for large language models. In The Twelfth International Conference on Learning Representations, 2024a. URL https://openreview.net/forum?id=gMLQwKDY3N.  
+Aiwei Liu, Leyi Pan, Xuming Hu, Shiao Meng, and Lijie Wen. A semantic invariant robust watermark for large language models. In The Twelfth International Conference on Learning Representations, 2024b. URL https://openreview.net/forum?id=6p81pe4MNf.  
+Yepeng Liu and Yuheng Bu. Adaptive text watermark for large language models, 2024.
+
+Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov. Roberta: A robustly optimized bert pretraining approach. arXiv preprint arXiv:1907.11692, 2019.  
+Xiaoliang Luo, Akilles Rechardt, Guangzhi Sun, Kevin K. Nejad, Felipe Yáñez, Bati Yilmaz, Kangjoo Lee, Alexandra O. Cohen, Valentina Borghesani, Anton Pashkov, Daniele Marinazzo, Jonathan Nicholas, Alessandro Salatiello, Ilia Sucholutsky, Pasquale Minervini, Sepehr Razavi, Roberta Rocca, Elkhan Yusifov, Tereza Okalova, Nianlong Gu, Martin Ferianc, Mikail Khona, Kaustubh R. Patil, et al. Large language models surpass human experts in predicting neuroscience results, 2024.  
+Yizhen Luo, Jiahuan Zhang, Siqi Fan, Kai Yang, Yushuai Wu, Mu Qiao, and Zaiqing Nie. Biomedgpt: Open multimodal generative pre-trained transformer for biomedicine, 2023.  
+Macedo Maia, Siegfried Handschuh, André Freitas, Brian Davis, Ross McDermott, Manel Zarrouk, and Alexandra Balahur. Ww'18 open challenge: Financial opinion mining and question answering. In Companion Proceedings of the The Web Conference 2018, WWW '18, pp. 1941-1942, Republic and Canton of Geneva, CHE, 2018. International World Wide Web Conferences Steering Committee. ISBN 9781450356404. doi: 10.1145/3184558.3192301. URL https://doi.org/10.1145/3184558.3192301.  
+OpenAI. Gpt-4 technical report. arXiv preprint arXiv:2303.08774, 2023. URL https://arxiv.org/abs/2303.08774.pdf.  
+Slav Petrov, Dipanjan Das, and Ryan McDonald. A universal part-of-speech tagset. In Proceedings of the Eighth International Conference on Language Resources and Evaluation (LREC'12), pp. 2089-2096, Istanbul, Turkey, May 2012. European Language Resources Association (ELRA). URL http://www.lrec-conf.org/proceedings/lrec2012/pdf/274_Paper.pdf.  
+Julien Piet, Chawin Sitawarin, Vivian Fang, Norman Mu, and David Wagner. Mark my words: Analyzing and evaluating language model watermarks. arXiv preprint arXiv:2312.00273, 2023.  
+Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, and Peter J Liu. Exploring the limits of transfer learning with a unified text-to-text transformer. Journal of machine learning research, 21(140):1-67, 2020.  
+Vinu Sankar Sadasivan, Aounon Kumar, Sriram Balasubramanian, Wenxiao Wang, and Soheil Feizi. Can ai-generated text be reliably detected? arXiv preprint arXiv:2303.11156, 2023.  
+Ann Taylor, Mitchell Marcus, and Beatrice Santorini. The penn treebank: An overview. 01 2003. doi: 10.1007/978-94-010-0201-1_1.  
+Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, et al. Llama: Open and efficient foundation language models. arXiv preprint arXiv:2302.13971, 2023.  
+Shangqing Tu, Yuliang Sun, Yushi Bai, Jifan Yu, Lei Hou, and Juanzi Li. Waterbench: Towards holistic evaluation of watermarks for large language models. arXiv preprint arXiv:2311.07138, 2023.  
+Lean Wang, Wenkai Yang, Deli Chen, Hao Zhou, Yankai Lin, Fandong Meng, Jie Zhou, and Xu Sun. Towards codable watermarking for injecting multi-bits information to LLMs. In The Twelfth International Conference on Learning Representations, 2024. URL https://openreview.net/forum?id=JYu5Flqm9D.  
+Xuandong Zhao, Prabhanjan Vijendra Ananth, Lei Li, and Yu-Xiang Wang. Provable robust watermarking for AI-generated text. In The Twelfth International Conference on Learning Representations, 2024. URL https://openreview.net/forum?id=SsmT8aO45L.  
+Ming Zhong, Da Yin, Tao Yu, Ahmad Zaidi, Mutethia Mutuma, Rahul Jha, Ahmed Hassan Awadallah, Asli Celikyilmaz, Yang Liu, Xipeng Qiu, and Dragomir Radev. QMSum: A new benchmark for query-based multi-domain meeting summarization. In Proceedings of the 2021 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, pp. 5905-5921, Online, June 2021. Association for Computational Linguistics. doi: 10.18653/v1/2021.nacl-main.472. URL https://aclanthology.org/2021.nacl-main.472.

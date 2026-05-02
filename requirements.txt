@@ -1,0 +1,30 @@
+# Core runtime for the current evaluation/testing pipeline
+vllm==0.8.5.post1
+openai==2.6.0
+requests==2.32.5
+datasets==4.2.0
+transformers==4.57.1
+tqdm==4.67.1
+numpy==2.2.6
+
+# Optional: full-text metrics in src/evaluation/_4_evaluation.py
+nltk==3.9.3
+rouge-score==0.1.2
+bert-score==0.3.13
+
+# Optional: benchmark crawling / construction
+openreview-py
+PyPDF2
+# mineru[core]  # Only needed if you use MinerU-based PDF/markdown extraction in the benchmark construction pipeline.
+
+# Included: AI-Scientist reviewer-mode dependencies used by src/evaluation/_1_query_ai_reviewer.py
+anthropic==0.78.0
+backoff==2.2.1
+pypdf==6.4.2
+PyMuPDF==1.26.7
+pymupdf4llm==0.2.9
+tiktoken==0.12.0
+
+# Optional: training helpers
+# torch==2.6.0
+# peft==0.17.1

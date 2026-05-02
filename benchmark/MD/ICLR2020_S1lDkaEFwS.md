@@ -1,0 +1,331 @@
+# THwarting FINITE DIFFERENCE ADVERSARIAL ATTACKS WITH OUTPUT RANDOMIZATION
+
+Anonymous authors
+
+Paper under double-blind review
+
+# ABSTRACT
+
+Adversarial input poses a critical problem to deep neural networks (DNN). This problem is more severe in the "black box" setting where an adversary only needs to repeatedly query a DNN to estimate the gradients required to create adversarial examples. Current defense techniques against attacks in this setting are not effective. Thus, in this paper, we present a novel defense technique based on randomization applied to a DNN's output layer. While effective as a defense technique, this approach introduces a trade off between accuracy and robustness. We show that for certain types of randomization, we can bound the probability of introducing errors by carefully setting distributional parameters. For the particular case of finite difference black box attacks, we quantify the error introduced by the defense in the finite difference estimate of the gradient. Lastly, we show empirically that the defense can thwart three adaptive black box adversarial attack algorithms.
+
+# 1 INTRODUCTION
+
+The success of deep neural networks has led to scrutiny of the security vulnerabilities in deep neural network based models. One particular area of concern is weakness to adversarial input: carefully crafted inputs that resist detection and can cause arbitrary errors in the model (1; 2). This is especially highlighted in the domain of image classification, where an adversary creates an image that resembles a natural image to a human observer but easily fools deep neural network based image classifiers (3).
+
+Different types of adversarial attacks exist throughout the lifecycle of a deep neural network model. For example, adversaries can attack a model during training by injecting corrupting data into the training set or by modifying data in the training set. However, inference time attacks are more worrisome as they represent the bulk of realistic attack surfaces (4; 5; 6).
+
+The input created under an inference time attack is known as an adversarial example and methods for generating such examples have recently attracted much attention. In most cases, the adversarial example is created by perturbing a (correctly classified) input such that the model commits an error. The perturbation applied to the "clean" input is typically constrained to be undetectably small (7; 8; 9).
+
+Defending againsts adversarial attacks on deep neural networks is crucial and has seen relatively slow progress compared to the sophistication and progress of adversarial attacks (10; 11; 12; 13; 14; 15). This is because it is difficult to prove a defense can withstand the types of attacks it is designed for especially when the defense must prove capable of withstanding "adaptive" adversaries that have knowledge of the details of the defense (16).
+
+A defense against adversarial attacks is defined by the threat model it is designed to defend against (16). The most permissive threat model makes the weakest assumptions about the adversary. One such threat model can be assuming the adversary has complete knowledge of the model, including architecture and parameters of the underlying network. This is known as the "white-box" setting. Other threat models can also be useful, such as assuming the adversary has knowledge of the network architecture but not the parameters of the model. More restrictive threat models allow only so called "black-box" attacks, attacks that can create adversarial examples without having access to the model architecture or weights and only accessing some form of output of the model.
+
+The rest of the paper is organized as follows. In Section 2, we discuss the threat model considered. In Section 3, we describe valid black box attacks under the threat model. Output randomization as a
+
+defense is described in Section 4. We show empirical results in Section 5, cover related approaches in Section 6, and conclude in Section 7.
+
+# 2 THREAT MODEL
+
+Adversary goals: The goal of the adversary is to force the classifier to commit an error within a distortion limit, such that the example crafted by the adversary is similar to the original example. The adversary induces such an error in an untargeted or targeted attack. The goal of an untargeted attack is misclassification of an input, whereas the goal of a targeted attack is misclassification of an input as a class specified by the adversary.
+
+Adversary knowledge: The adversary has access to the model only at the input and output level, and has no knowledge of its architecture or parameters. This black-box adversary is aware of the details of the defenses protecting the model and the type of randomness associated with any defense but not the exact random numbers generated.
+
+Adversary capability: The adversary only has access to the model by providing examples as input and observing the output probability vector generated by the model as output. The adversary can modify aspects of the input in any way as long as it remains similar to the original input. This similarity is controlled by an  $l_{p}$  distortion penalty on the adversarial image. Common choices for the distortion penalty include  $l_{1}, l_{2}$  and  $l_{\infty}$ . We use the  $l_{2}$  perturbation penalty as this type of attack results in the strongest attacks (17). Attackers are allowed to query the model up to a maximum limit, which we increase to our computational limit to strengthen attacks. In addition to a maximum query limit, attackers often use an early stopping parameter to avoid wasting computation on unpromising direction during optimization. We also increase this parameter to test our defense against stronger attacks.
+
+# 3 EXISTING BLACK BOX ATTACKS
+
+Black box attacks are called "gradient-free" attacks since they do not involve computing gradients of the input by backpropagation on the model under attack. Instead the gradients of the input are estimated by using the finite difference estimate for each input feature.
+
+Black box attacks can be categorized by the type of output the adversary is allowed to observe: logit layer, class probabilities/softmax layer, or top  $k$  class probabilities/labels.
+
+In general, designing successful black box attacks in the label only setting is much harder than the setting where the logit layer or softmax layer is available to the attacker. We consider the easiest setting for black box attacks, where all the class probabilities are available.
+
+# 3.1 ZOO BLACK BOX ATTACK
+
+The Zeroth Order Optimization based black-box (ZOO) attack (18) is a method for creating adversarial examples for deep neural networks that only requires input and output access to the model. ZOO adopts a similar iterative optimization based approach to adversarial example generation as other successful attacks, such as the Carlini & Wagner (C&W) attack (17). The attack begins with a correctly classified input image  $x$ , defines an adversarial loss function that scores perturbations  $\delta$  applied to the input, and optimizes the adversarial loss function using gradient descent to find  $\delta^{*}$  that creates a successful adversarial example. Specifically, gradient descent is used to find  $\delta^{*}$  such that:
+
+$$
+f (x + \delta^ {*}) = y ^ {a}
+$$
+
+$$
+\left\| x - \left(x + \delta^ {*}\right) \right\| \leq \epsilon
+$$
+
+Namely, that the perturbed input  $x + \delta^{*}$  successfully fools the classifier  $f$  to predict the incorrect class  $y^{a}$  and that the perturbed input is similar to the original input up to some distortion limit  $\epsilon$ .
+
+The primary (and strongest) adversarial loss used by the ZOO attack for targeted attacks is given by:
+
+$$
+L (x, t) = \max  \left\{\max  _ {i \neq t} \left\{\log f (x) _ {i} - \log f (x) _ {t} \right\}, - \kappa \right\} \tag {1}
+$$
+
+Where  $x$  is an input image,  $t$  is a target class, and  $\kappa$  is a tuning parameter. Minimizing this loss function over the input  $x$  causes the classifier to predict class  $t$  for the optimized input. For untargeted attacks, a similar loss function is used:
+
+$$
+L (x) = \max  \left\{\log f (x) _ {i} - \max  _ {j \neq i} \left\{\log f (x) _ {j} \right\}, - \kappa \right\} \tag {2}
+$$
+
+where  $i$  is the original label for the input  $x$ . This loss function simply pushes  $x$  to enter a region of misclassification for the classifier  $f$ .
+
+In order to limit distortion of the original input, the adversarial loss function is combined with a distortion penalty in the full optimization problem. This is given by:
+
+$$
+\min  _ {x} \| x - x _ {0} \| _ {2} ^ {2} + c \cdot L (x, t)
+$$
+
+$$
+\text {s u b j e c t} x \in [ 0, 1 ] ^ {n}
+$$
+
+In the white box setting, attackers can take advantage of the backprogation algorithm to calculate the gradient of the adversarial loss function with respect to the input coordinates  $\left(\frac{\delta L}{\delta x_i}\right)$  and solve the optimization problem using gradient descent. In lieu of this, ZOO uses "zeroth order stochastic coordinate descent" to optimize input on the adversarial loss directly. This is most easily understood as a finite difference estimate of the gradient of the input with the symmetric difference quotient (18):
+
+$$
+\frac {\delta L}{\delta x _ {i}} \approx g _ {i} := \frac {L (x + h e _ {i}) - L (x - h e _ {i})}{2 h}
+$$
+
+with  $e_i$  as the basis vector for coordinate/pixel  $i$  and  $h$  set to a small constant. The ZOO attack uses this approximation to the gradients to create an adversarial example from the given input. Note that for an image with  $n$  pixels, computing an estimate of the gradient with respect to each pixel requires  $2n$  queries to the model. Since this is usually prohibitive, the ZOO attack circumvents this by only estimating the gradients for a subset of coordinates at each step. ZOO also uses dimensionality reduction and a hierarchical approach to further increase the efficiency of the attack and show empirically that these methods are effective (18).
+
+# 3.2 QUERY LIMITED (QL) BLACK BOX ATTACK
+
+A similar approach to ZOO is adopted by (19) in a query limited setting. Like ZOO, the QL attack estimates the gradients of the adversarial loss using a finite difference based approach. However, the QL attack reduces the number of queries required to estimate the gradients by employing a search distribution. Natural Evolutionary Strategies (NES) (20) is used as a black box to estimate gradients from a limited number of model evaluations. Projected Gradient Descent (PGD) (12) is used to update the adversarial example using the estimated gradients. PGD uses the sign of the estimated gradients to perform an update:  $x^{t} = x^{t - 1} - \eta \cdot \mathrm{sign}(g_{t})$ , with a step size  $\eta$  and the estimated gradient  $g_{t}$ . The estimated gradient for the QL attack using NES is given by:
+
+$$
+g _ {t} = \sum_ {i = 1} ^ {m} \frac {L (x + \sigma \cdot u _ {i}) \cdot u _ {i} - L (x - \sigma \cdot u _ {i}) \cdot u _ {i}}{2 m \sigma}
+$$
+
+where  $u_{i}$  is sampled from a standard normal distribution with the same dimension as the input  $x$ ,  $\sigma$  is the search variance, and  $m$  is the number of samples used to estimate the gradient. The difference between this approach and ZOO is that ZOO attempts to estimate the gradient with respect to one coordinate at a time while this approach averages over perturbations to many coordinates to estimate the entire gradient directly.
+
+In the next section, we show that applying a simple randomization function (that does not affect model accuracy) to the output of a model causes these types of attacks to fail even if the attack is adapted to the specific randomization function.
+
+# 4 THwartING BLACK BOX ATTACKS
+
+The intuition behind output randomization is that a model may deliberately make errors in its predictions in order to thwart a potential attacker. This simple idea introduces a tradeoff between accurate predictions and the effectiveness of finite difference based black box adversarial attacks.
+
+Output randomization for a model that produces a probability distribution over class labels replaces the output of the model  $p$  by a stochastic function  $d(p)$ . The function  $d$  must satisfy two conditions:
+
+1. The probability of misclassifying an input due to applying  $d$  is bounded by  $K$  
+2. The vector  $d(p)$  prevents adversaries under the given threat model from generating adversarial examples.
+
+The first condition ensures that the applied defense minimally impacts non-adversarial users of the model, such as users of an online image classification service. The effectiveness of the defense comes from satisfying the second condition as the introduced randomness must prevent an adversary (in the appropriate setting) from producing an adversarial example.
+
+In the following two sections, we consider a simple noise-inducing function  $d(p) = p + \epsilon$  where  $\epsilon$  is a random variable.
+
+# 4.1 MISSCLASSIFICATION RATE
+
+A simple function useful for defending a model is the gaussian noise function  $d(p) = p + \epsilon$  where  $\epsilon$  is a gaussian random variable with mean  $\mu$  and variance  $\sigma^2$  ( $\epsilon \sim \mathcal{N}(\mu, \sigma^2 \cdot \mathbf{I}_C)$ ). In the black box setting, a user querying the model with an input  $x$  receives the perturbed vector  $d(p)$  instead of the true probability vector  $p$ . Note that  $d(p)$  does not necessarily represent a probability mass function like  $p$ .
+
+To verify that this function satisfies the first condition above, we wish to know the probability that the class predicted by the undefended model is the same as the class predicted by the defended model. If the output of the model for an input  $x$  is  $p$ , we will refer to the maximum element of  $p$  as  $p_m$  and the rest of the elements of  $p$  in decreasing order as  $p_2, p_3, \ldots, p_C$ .
+
+Suppose the model correctly classifies the input  $x$  in the vector  $p$ , we can express the probability that  $x$  is misclassified in the vector  $d(p)$  as:
+
+$$
+\sum_ {i = 2} ^ {C} \mathbb {P} (d (p _ {i}) > d (p _ {m}))
+$$
+
+We can write  $\mathbb{P}(d(p_i) > d(p_m))$  for  $i = 2,3,\ldots C$  as:
+
+$$
+\mathbb {P} (d (p _ {i}) > d (p _ {m})) = \mathbb {P} (p _ {i} + \epsilon_ {i} > p _ {m} + \epsilon_ {m})
+$$
+
+If we define  $\delta_{i} = p_{m} - p_{i}$ , as shown in Figure 1a, and since  $e_i\coloneqq \epsilon_i - \epsilon_m$  is itself a gaussian with mean  $\mu_{i} - \mu_{m}$  and variance  $\sigma_i^2 +\sigma_m^2$  then we can write:
+
+$$
+\mathbb {P} (e _ {i} > \delta_ {i}) = 1 - \mathbb {P} (e _ {i} \leq \delta_ {i}) = 1 - \mathbb {P} \left(\frac {e _ {i} - \mu_ {i} + \mu_ {m}}{\sigma_ {i} ^ {2} + \sigma_ {m} ^ {2}} \leq \frac {\delta_ {i} - \mu_ {i} + \mu_ {m}}{\sigma_ {i} ^ {2} + \sigma_ {m} ^ {2}}\right)
+$$
+
+Using the cumulative distribution function of a standard gaussian distribution  $\Phi$ , we can write the misclassification probability as:
+
+$$
+K := \mathbb {P} (d (p _ {i}) > d (p _ {m})) = 1 - \Phi \left(\frac {\delta_ {i} - \mu_ {i} + \mu_ {m}}{\sigma_ {i} ^ {2} + \sigma_ {m} ^ {2}}\right) = \Phi \left(- \frac {\delta_ {i} - \mu_ {i} + \mu_ {m}}{\sigma_ {i} ^ {2} + \sigma_ {m} ^ {2}}\right)
+$$
+
+For the special case of a gaussian noise function  $d(p)$  with mean 0 and variance  $\sigma^2$  we would like to fix the probability of misclassification to a value  $K$  and compute the appropriate variance  $\sigma^2$ . We can use the inverse of the standard gaussian cdf  $\Phi^{-1}$ , or the probit function, to write this easily:
+
+$$
+\sigma^ {2} = - \frac {\delta_ {i}}{2 \Phi^ {- 1} (K)}
+$$
+
+Note that the desired misclassification rate  $K < 0.5$  in any real case and so the rho will be positive. If we consider  $\delta_{i}$  as the confidence of the model, then the allowable variance will be larger when the model is confident and smaller otherwise. We show the calculations above for one class  $i$ , the misclassification probability  $(K)$  and level of noise  $(\sigma^2)$  can be set for each class separately. In Figure 1b we show the maximum allowable variance for different misclassification rates.
+
+Figure 1: Controlling misclassification caused by output randomization  
+![](images/757d5a9531e9a0b9d444e4e8a4a4884d976fcacd3b0dc074231b541d60854923.jpg)  
+(a) Probability distribution over classes generated (b) Maximum output randomization  $\sigma^2$  vs  $\delta_{i}$  for misby a classification model.  $\delta_{i}$  represents the relative classification rates  $K = \{20\% ,10\% ,1\% ,0.5\% \}$  confidence of the model's prediction.
+
+![](images/b31af96feb80b33b1b43c37f188bb75cc0845567a74646a4e3ee398e3e0efb56.jpg)
+
+# 4.2 FINITE DIFFERENCE GRADIENT ERROR
+
+To verify the function  $d(p)$  satisfies the second condition, that it introduces error that prevents a finite difference based black box attack, we show the effect of the output randomization on the gradient accessible to the adversary.
+
+Finite difference (FD) based approaches involve evaluating the adversarial loss at two points,  $x + he_i$  and  $x - he_i$ , close to  $x$  (with small  $h$  and unit vector  $e_i$ ) and using the slope to estimate the gradient of the loss with respect to pixel  $i$  of the input. For a loss function  $L$ , the finite difference estimate of the gradient of pixel  $i$  is given by:
+
+$$
+g _ {i} = \frac {L (f (x + h e _ {i})) - L (f (x - h e _ {i}))}{2 h}
+$$
+
+Here, we write the adversarial loss function (either the untargeted loss in Equation 2 or the targeted loss in Equation 1) in terms of the output of the model to make explicit the dependence of  $L$  on the output vector of the network  $p = f(\cdot)$ .  $p$  and  $p'$  are used to distinguish between the two output vectors needed to compute the gradient estimate. When the network is defended using output randomization, the function  $d(\cdot)$  is applied to the output vector of the network. Thus, the finite difference gradient computed by the attacker is:
+
+$$
+\gamma_ {i} = \frac {L (d (p)) - L (d \left(p ^ {\prime}\right))}{2 h}
+$$
+
+The error in the FD gradient introduced by the defense is given by  $|g_i - \gamma_i|$ . When  $d$  is a function that adds noise  $\epsilon$  to the output of the network, the expected value of the error is:
+
+$$
+\left| E \left[ g _ {i} - \gamma_ {i} \right] \right| = \left| g _ {i} - E \left[ \frac {L (p + \epsilon) - L \left(p ^ {\prime} + \epsilon^ {\prime}\right)}{2 h} \right] \right|
+$$
+
+This error term depends on the choice of the adversarial loss function  $L(\cdot)$ . Since the untargeted attack is generally considered easier than the targeted attack, consider how the gradient error of the defended model behaves under the untargeted adversarial loss function. For untargeted attacks, we simplify the loss function to:  $L_{u}(p) = \log (p_{c}) - \log (p_{o}) = \log (\frac{p_{c}}{p_{o}})$  where  $p_c$  is the probability of the true class and  $p_o$  is the maximum probability assigned to a class other than the true class of the input image.
+
+Substituting the untargeted adversarial loss for  $L(\cdot)$  we see:
+
+$$
+| E [ g _ {i} - \gamma_ {i} ] | = \left| g _ {i} - \frac {1}{2 h} E \left[ \log (\frac {p _ {c} + \epsilon_ {c}}{p _ {o} + \epsilon_ {o}}) - \log (\frac {p _ {c} ^ {\prime} + \epsilon_ {c} ^ {\prime}}{p _ {o} ^ {\prime} + \epsilon_ {o} ^ {\prime}}) \right] \right|
+$$
+
+We use a second order Taylor series approximation of  $E[\log(X)] \approx \log(E[X]) - \frac{\text{Var}[X]}{2E[X]^2}$  to approximate the expectations. If we further assume  $\epsilon$  is zero-mean with variance  $\sigma^2$ , then  $E[p + \epsilon] = p$  and the expectation of the defended gradient is approximately:
+
+$$
+| E [ g _ {i} - \gamma_ {i} ] | \approx \left| \frac {\sigma^ {2}}{4 h} \left(\frac {\sigma^ {2} + p _ {o} ^ {2} + p _ {c} ^ {2 ^ {\prime}}}{p _ {c} ^ {2 ^ {\prime}} p _ {o} ^ {2}} - \frac {\sigma^ {2} + p _ {o} ^ {2 ^ {\prime}} + p _ {c} ^ {2}}{p _ {c} ^ {2} p _ {o} ^ {2 ^ {\prime}}}\right) \right|
+$$
+
+This approximation summarizes the suprising effect output randomization has on finite difference based black box attacks. Firstly, it is easy to see that the error scales with the variance of  $\epsilon$  (in the zero mean case). Even when the adversary adapts to the defense by averaging over the output randomization the variance is only reduced linearly by the number of samples. Secondly, even in expectation the error is never non-zero. This is because one of two cases must be true in order for the error to be zero:
+
+1.  $p_c = p_o$  and  $p_c' = p_o'$  
+2.  $p_c == p_c'$  and  $p_o == p_o'$
+
+Case 1 cannot occur because it implies the model is predicting two different classes simultaneously. Case 2 will only occur if  $L(p) == L(p')$  which means  $g_{i} = 0$ .
+
+The reason for this behavior is mostly due to the log operation in the adversarial loss function  $L$ . As noted by the authors in (18), the log is crucial to the success of finite difference black box attacks as well trained models yield skewed distributions in the output  $p = f(x)$ . In our experiments, we show that this behavior holds in real world experiments on image classification datasets.
+
+# 5 EMPIRICAL RESULTS
+
+To evaluate the output randomization defense against black box attacks, we select three successful black box attacks (ZOO (18), QL (19), and BAND (21)) on benchmark image classification datasets (MNIST (22), CIFAR10 (23), and ImageNet (24)). For all defended models, we use  $\epsilon \sim \mathcal{N}(0, \sigma^2 \cdot \mathbf{I}_C)$ . Details of both the attacks and defenses can be found in our code<sup>1</sup> and the appendix. We follow the guidelines laid out in (16), most importantly we attempt to adapt the attacks to the proposed defense. In this case, this means the attacker is aware of the type of randomization applied to the output of the network. Therefore, we adapt the attacks by allowing the attacker to average over the output randomization in an attempt to bypass the defense. This type of adaptation has been shown to overcome certain types of input and model randomization defenses (25). In our results, we refer to this as the adaptive attack.
+
+As a sanity check, we also measure the attack success rate of a white box attacker (Carlini & Wagner L2 (17) attack) with randomized output. We find that the defense has some success in defending against this attack in the non-adaptive case. However the adaptive white box attacker is able to overcome the output randomization by averaging over a small number of samples. This is summarized in Figure 2.
+
+Our main set of experiments is shown in Figure 3 and show the effects of output randomization on the non-adaptive and adaptive ZOO attacks. We show that the defense reduces the attack success rate significantly even in the adaptive attacker setting, where we average over randomness and double attack iterations. The effectiveness of the defense was not affected by targeted or untargeted attacks. Table 1 summarizes the results for three finite difference based black box attacks on ImageNet.
+
+It is important to show how a defense affects the "normal" operating properties of a model and this is typically demonstrated by comparing the test set accuracy of the defended model to the undefended model. Figure 2a and Figure 3a show the effect of increasing noise levels on test set accuracy. Output randomization is an effective defense against black box attacks at noise levels as small as  $\sigma^2 = 1\mathrm{e} - 4$  where model performance is identical to undefended models.
+
+![](images/286c0ca9be35136ce54b7103082e09848281bc80a2ee030d453b20e62ea7c20e.jpg)
+
+![](images/f037c0568ebe5068ae67ab7610eb2cb5c6b2f6dd3dcdb9f27400fda6ef74f14e.jpg)
+
+![](images/3e3102f7730713a3e974f70ac84711151a737602aa83742e020c889f03659b99.jpg)
+
+![](images/2e26f4c7ef48ff7d9784b7fa9ec6d691fe9f82fa47ef19b09c016829e22c5c1b.jpg)
+
+![](images/cba2a01790cf4ec63c927958688fe9f1dd48867be1f9aea371f8d1f93304a5ee.jpg)
+
+![](images/bbc62f07a670c1303ac3f87aa2ced3142322860b93b7fc65e017fd31305076f8.jpg)
+
+![](images/a9990267db79d9449bcaa0908db5be49fa82fd041fd7c82285a1357361bf6b37.jpg)  
+(a) Attack success rate (solid) and test set accuracy (b) Attack success rate vs variance (groups) for adap-dashed) vs variance for the non-adaptive attacker. Out-tive attacker with increasing averaging (10, 50, 100 put randomization is not effective against a white box samples). Averaging allows the white box adaptive attacker at small noise levels. attacker to overcome output randomization.
+
+![](images/5e0c0fb5bc0c233b06e6e1e14f6b1b1c231ef997b6b6bf10197841f6e872d56c.jpg)
+
+![](images/d05f64a0c3d5fbf0cc06968a5935e65c0e5c5a303eb96bce4360dc6ea2be1ebd.jpg)
+
+![](images/4467006a79a247649003a280136a7e9508ef74ea47cc395dd52b4966d630bbe0.jpg)
+
+![](images/ee8cd158f731e9b4b0e5e24238a5962c042ff0c544999062d1561c2d09c21c2d.jpg)
+
+![](images/c585021710f8251ffe37bf48b50c6513d6e260039ad674a8165672f6a771427f.jpg)
+
+![](images/a6895dba7ecad89a451fd852497bc14f4e6095522d879a2fa6c18933c28bcb1a.jpg)  
+Figure 2: Carlini & Wagner (17) white box attack versus output randomization. Top row shows untargeted attacks, bottom row shows targeted attacks.
+
+![](images/1dd2fcf42df4e5902e2afb84bb1c96fe51fe8b39ba1ea02b9a7f0df74c2d44b2.jpg)  
+Figure 3: ZOO (18) black box attack versus output randomization. Top row shows untargeted attacks, bottom row shows targeted attacks. Compare this figure with the white box attack results in Figure 2.
+
+![](images/5d73e2397158322ed56ee98d8a05612cd51acbe6a778b614ab434a79a3b9b590.jpg)
+
+![](images/881d4d934f92ec84578e245577574a83b3d2b5ca8455b30db1476f563d3c4212.jpg)
+
+![](images/42d6e1732f1f67c06c8f504d40dae14aa685d2bb948ee7d2b9064da03a0410dc.jpg)
+
+![](images/440007cd5dc23e52f3264f1adb92d0d2fb33deff305cfc9fe703ea0932e10198.jpg)
+
+![](images/1dc1615811e3d1e510bae5369329e3e9136d1adec64842d1358d5cd85c1dbf87.jpg)  
+(a) Attack success rate (solid) and test set accuracy (b) Attack success rate vs variance (bar groups) for (dashed) vs variance for the non-adaptive attacker. Out-adaptive attacker with increasing averaging (10, 50, 100 put randomization blocks attacks even at very small samples). Averaging does not improve attack success noise levels  $(\sigma^2 < 1\mathrm{e} - 6)$ . rate of the black box attacker.
+
+![](images/e1681775ce7ce93c5c4883d380347c3f90b5745ecdb102519c335a63e4a52873.jpg)
+
+![](images/d4c11ae301c854f3460e95d840ab261da1ce7af43217a814e19b27e4d4ba4fcd.jpg)
+
+![](images/0628d521641bd1c7e6a06de58f5baa6ef82a30a44c93af60a2909f061747b5e8.jpg)
+
+![](images/7e40b9a6f344c8a167a744f7b0ee6d204e21ec06f04acc778113441e3696d90a.jpg)
+
+![](images/745f00ec791004095ba2ffaed9a377592480409c10cee294ebefbfdedf38cdb7.jpg)
+
+Defensive techniques without output randomization are still vulnerable to black box attacks. We evaluated defensive distillation (10) and input randomization (26) against the ZOO attack and found that these defenses did not reduce the attack success rate significantly as shown in Table 2. Distillation is shown to be vulnerable to white box attacks in (17), we show it is also vulnerable to finite difference black box attacks. Input randomization (26) has limited success in defending against ZOO (reducing attack success rate to 0.76), however it is not as effective as output randomization. This is because randomization applied at the input is not guaranteed to affect the finite difference gradient estimates. In addition, input randomization also does not allow fine control over model accuracy.
+
+Table 1: Output randomization vs 3 black box attacks on 100 correctly classified ImageNet examples measured by attack success rate (fraction of examples misclassified)  
+
+<table><tr><td>Noise Variance</td><td>ZOO (18)</td><td>QL (19)</td><td>BAND (21)</td></tr><tr><td>(und defended)</td><td>0.69</td><td>1.00</td><td>0.92</td></tr><tr><td>1.00e-4</td><td>0.03</td><td>0.73</td><td>0.58</td></tr><tr><td>1.00e-2</td><td>0.00</td><td>0.02</td><td>0.07</td></tr><tr><td>5.76e-2</td><td>0.00</td><td>0.01</td><td>0.06</td></tr></table>
+
+Table 2: ZOO black box attack success rate vs three defenses  
+
+<table><tr><td>Dataset</td><td>Ex. Type</td><td>Distillation(10)</td><td>Mitigation(26)</td><td>OR (ours)</td></tr><tr><td>MNIST</td><td>Targeted</td><td>1.00</td><td>-</td><td>0.00</td></tr><tr><td>MNIST</td><td>Untargeted</td><td>0.99</td><td>-</td><td>0.01</td></tr><tr><td>CIFAR10</td><td>Targeted</td><td>1.00</td><td>-</td><td>0.011</td></tr><tr><td>CIFAR10</td><td>Untargeted</td><td>1.00</td><td>-</td><td>0.19</td></tr><tr><td>ImageNet</td><td>Untargeted</td><td>-</td><td>0.76</td><td>0.005</td></tr></table>
+
+# 6 RELATED WORK
+
+In this section, we discuss related gradient masking or obfuscated gradient defenses. We will focus on proactive defenses, which attempt to make a network robust, compared to reactive defenses, which attempt to detect adversarial examples. (25) defined three ways to obfuscate gradients: shattered gradients, exploding/vanishing gradients, and stochastic gradients.
+
+Shattered gradients are a non-differentiable defense that causes a gradient to be nonexistent or incorrect. This can be done unintentionally by introducing numeric instability. (27) and (28) proposed shattered gradients defenses that introduce a non-differentiable and non-linear discretization to a model's input. These transformations are ineffective as black box attacks are agnostic of input randomization.
+
+Exploding gradients make a network hard to train because of an extremely deep neural network. This is generally done by using an output of a neural network as the input of another. (29) and (30) both proposed defenses that utilize GANs. However, (25) shows that these defenses can be bypassed using transferability of adversarial attacks. The transferability property allows an attacker to use adversarial examples created using one model (often a surrogate model) to fool another model (31). Although this is a valid attack vector for even black box models, we do not consider this type of attack in this work.
+
+Stochastic gradients randomize gradients by introducing some randomization to the network or randomly transforming the input to the network. (32) proposed a stochastic gradients defense in which a random subset of activations are pruned. (26) introduced randomness by randomly rescaling input images. (25) showed that an adaptive attacker can bypass these defenses by computing the expected value over multiple queries. We test a similar approach on output randomization and show it is not effective in the black box case (Figure 3b).
+
+Although other defense methods consider introducing randomness to the input or model itself, this work is the first to our knowledge to consider randomizing the output of the model directly.
+
+# 7 CONCLUSION
+
+Black box attacks based on finite difference gradient estimates pose a threat to classification models without needing privileged access to the model. In this paper, we show that this threat can averted by introducing simple types of randomization to the output of the model. Our empirical results show that even very small  $(\sigma^2 = 1\mathrm{e} - 6)$  perturbations to the output can prevent these type of attacks.
+
+Although our work shows an encouraging result for defending against black box attacks, we show that output randomization (or other types of randomization) do not prevent white box attacks (25). Furthermore, output randomization only prevents query based black box attacks and does not address the problem of transfer attacks (33; 31). Other attacks, such as  $\mathcal{N}$  Attack (34), utilize derivative-free optimization to find adversarial examples bypassing the need for finite difference estimates. We leave defense against these types of attacks to future work.
+
+# REFERENCES
+
+[1] C. Szegedy, W. Zaremba, I. Sutskever, J. Bruna, D. Erhan, I. Goodfellow, and R. Fergus, "Intriguing properties of neural networks," pp. 1-10, 2013. [Online]. Available: http://arxiv.org/abs/1312.6199--
+
+[2] I. J. Goodfellow, J. Shlens, and C. Szegedy, “Explaining and Harnessing Adversarial Examples,” pp. 1–11, 2014. [Online]. Available: http://arxiv.org/abs/1412.6572  
+[3] A. Kurakin, I. Goodfellow, and S. Bengio, "Adversarial examples in the physical world," no. c, pp. 1-14, 2016. [Online]. Available: http://arxiv.org/abs/1607.02533  
+[4] K. Grosse, N. Papernot, P. Manoharan, M. Backes, and P. McDaniel, “Adversarial Perturbations Against Deep Neural Networks for Malware Classification,” jun 2016. [Online]. Available: http://arxiv.org/abs/1606.04435  
+[5] N. Narodytska and S. P. Kasiviswanathan, "Simple Black-Box Adversarial Perturbations for Deep Networks," pp. 1-19, 2016. [Online]. Available: http://arxiv.org/abs/1612.06299  
+[6] N. Carlini and D. Wagner, "Audio adversarial examples: Targeted attacks on speech-to-text," in Proceedings - 2018 IEEE Symposium on Security and Privacy Workshops, SPW 2018. Institute of Electrical and Electronics Engineers Inc., aug 2018, pp. 1-7.  
+[7] N. Papernot, P. McDaniel, I. Goodfellow, S. Jha, Z. B. Celik, and A. Swami, "Practical Black-Box Attacks against Machine Learning," 2016. [Online]. Available: http://arxiv.org/abs/1602.02697  
+[8] S.-M. Moosavi-Dezfooli, A. Fawzi, O. Fawzi, and P. Frossard, "Universal Adversarial Perturbations," in 2017 IEEE Conference on Computer Vision and Pattern Recognition (CVPR), vol. 70, no. 5. IEEE, jul 2017, pp. 86–94. [Online]. Available: http://ieeexplore.ieee.org/document/8099500/  
+[9] N. Carlini, G. Katz, C. Barrett, and D. L. Dill, "Provably Minimally-Distorted Adversarial Examples," sep 2017. [Online]. Available: http://arxiv.org/abs/1709.10207  
+[10] N. Papernot, P. McDaniel, X. Wu, S. Jha, and A. Swami, "Distillation as a Defense to Adversarial Perturbations Against Deep Neural Networks," in 2016 IEEE Symposium on Security and Privacy (SP). IEEE, may 2016, pp. 582-597. [Online]. Available: http://ieeexplore.ieee.org/document/7546524/  
+[11] F. Tramèr, A. Kurakin, N. Papernot, I. Goodfellow, D. Boneh, and P. McDaniel, "Ensemble Adversarial Training: Attacks and Defenses," pp. 1–20, 2017. [Online]. Available: http://arxiv.org/abs/1705.07204  
+[12] A. Madry, A. Makelov, L. Schmidt, D. Tsipras, and A. Vladu, "Towards Deep Learning Models Resistant to Adversarial Attacks," pp. 1-27, 2017. [Online]. Available: http://arxiv.org/abs/1706.06083  
+[13] F. Croce, M. Andriushchenko, and M. Hein, "Provable Robustness of ReLU networks via Maximization of Linear Regions," oct 2018. [Online]. Available: http://arxiv.org/abs/1810.07481  
+[14] L. Schott, J. Rauber, M. Bethge, and W. Brendel, "Towards the first adversarially robust neural network model on MNIST," may 2018. [Online]. Available: http://arxiv.org/abs/1805.09190  
+[15] I. Rosenberg, A. Shabtai, Y. Elovici, and L. Rokach, "Defense Methods Against Adversarial Examples for Recurrent Neural Networks," jan 2019. [Online]. Available: http://arxiv.org/abs/1901.09963  
+[16] N. Carlini, A. Athalye, N. Papernot, W. Brendel, J. Rauber, D. Tsipras, I. Goodfellow, A. Madry, and A. Kurakin, "On Evaluating Adversarial Robustness," feb 2019. [Online]. Available: http://arxiv.org/abs/1902.06705  
+[17] N. Carlini and D. Wagner, "Towards Evaluating the Robustness of Neural Networks," Proceedings - IEEE Symposium on Security and Privacy, pp. 39-57, 2017.  
+[18] P.-Y. Chen, H. Zhang, Y. Sharma, J. Yi, and C.-J. Hsieh, “ZOO: Zeroth Order Optimization based Black-box Attacks to Deep Neural Networks without Training Substitute Models,” 2017. [Online]. Available: http://arxiv.org/abs/1708.03999{‰}0Ahttp://dx.doi.org/10.1145/3128572.3140448  
+[19] A. Ilyas, L. Engstrom, A. Athalye, and J. Lin, "Black-box Adversarial Attacks with Limited Queries and Information," 2018. [Online]. Available: http://arxiv.org/abs/1804.08598  
+[20] D. Wierstra, T. Schaul, T. Glasmachers, Y. Sun, J. Peters, and J. Schmidhuber, "Natural evolution strategies," The Journal of Machine Learning Research, vol. 15, no. 1, pp. 949-980, 2014.  
+[21] A. Ilyas, L. Engstrom, and A. Madry, “Prior convictions: Black-box adversarial attacks with bandits and priors,” *ICLR* 2019, 2018. [Online]. Available: https://arxiv.org/abs/1807.07978  
+[22] Y. LeCun, C. Cortes, and C. Burges, "Mnist handwritten digit database," AT&T Labs [Online]. Available: http://yann.lecun.com/exdb/mnist, vol. 2, p. 18, 2010.
+
+[23] A. Krizhevsky, V. Nair, and G. Hinton, "The cifar-10 dataset," online: http://www.cs.toronto.edu/kriz/cifar.html, vol. 55, 2014.  
+[24] J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-Fei, "Imagenet: A large-scale hierarchical image database," in 2009 IEEE conference on computer vision and pattern recognition. IEEE, 2009, pp. 248-255.  
+[25] A. Athalye, N. Carlini, and D. Wagner, “Obfuscated Gradients Give a False Sense of Security: Circumventing Defenses to Adversarial Examples,” 2018. [Online]. Available: http://arxiv.org/abs/1802.00420  
+[26] C. Xie, J. Wang, Z. Zhang, Z. Ren, and A. Yuille, "Mitigating Adversarial Effects Through Randomization," nov 2017. [Online]. Available: http://arxiv.org/abs/1711.01991  
+[27] J. Buckman, A. Roy, C. Raffel, and I. Goodfellow, "Thermometer Encoding: One Hot Way To Resist Adversarial Examples," *ICLR*, vol. 19, no. 1, pp. 92-97, 2018.  
+[28] C. Guo, M. Rana, M. Cisse, and L. van der Maaten, "Countering Adversarial Images using Input Transformations," oct 2017. [Online]. Available: http://arxiv.org/abs/1711.00117  
+[29] Y. Song, T. Kim, S. Nowozin, S. Ermon, and N. Kushner, "PixelDefend: Leveraging Generative Models to Understand and Defend against Adversarial Examples," oct 2017. [Online]. Available: http://arxiv.org/abs/1710.1076  
+[30] P. Samangouei, M. Kabbab, and R. Chellappa, "Defense-gan: Protecting classifiers against adversarial attacks using generative models," arXiv preprint arXiv:1805.06605, 2018.  
+[31] N. Papernot, P. McDaniel, and I. Goodfellow, "Transferability in Machine Learning: from Phenomena to Black-Box Attacks using Adversarial Samples," 2016. [Online]. Available: http://arxiv.org/abs/1605.07277  
+[32] G. S. Dhillon, K. Azizzadenesheli, Z. C. Lipton, J. Bernstein, J. Kossaifi, A. Khanna, and A. Anandkumar, "Stochastic Activation Pruning for Robust Adversarial Defense," mar 2018. [Online]. Available: http://arxiv.org/abs/1803.01442  
+[33] Y. Liu, X. Chen, C. Liu, and D. Song, "Delving into Transferable Adversarial Examples and Black-box Attacks," no. 2, pp. 1-24, 2016. [Online]. Available: http://arxiv.org/abs/1611.02770  
+[34] Y. Li, L. Li, L. Wang, T. Zhang, and B. Gong, "NATTACK: Learning the distributions of adversarial examples for an improved black-box attack on deep neural networks," in Proceedings of the 36th International Conference on Machine Learning, ser. Proceedings of Machine Learning Research, K. Chaudhuri and R. Salakhutdinov, Eds., vol. 97. Long Beach, California, USA: PMLR, 09-15 Jun 2019, pp. 3866-3876. [Online]. Available: http://proceedings.mlr.press/v97/1i19g.html  
+[35] D. P. Kingma and J. Ba, "Adam: A method for stochastic optimization," arXiv preprint arXiv:1412.6980, 2014.
